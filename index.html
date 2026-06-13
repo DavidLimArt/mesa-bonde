@@ -144,6 +144,19 @@
             box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
         }
 
+        .char-card.active-for-mesa {
+            border-color: #4dff88 !important;
+            box-shadow: 0 0 15px rgba(77, 255, 136, 0.3);
+        }
+
+        .char-card.active-for-mesa::after {
+            content: '✅';
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 14px;
+        }
+
         .char-card-img {
             width: 100px;
             height: 100px;
@@ -1141,7 +1154,8 @@
         <div class="selection-controls-bar">
             <h1 class="main-title">🏰 Gerenciador de Personagens D&D</h1>
                 <div class="selection-controls-right">
-                    <button onclick="initOnline()" style="border-color:#4dff88; color:#4dff88;">Conectar Mesa</button>
+                    <button id="online-btn" onclick="initOnline()" style="border-color:#4dff88; color:#4dff88;">Conectar Mesa</button>
+                    <button id="confirm-selection-btn" onclick="confirmSelection()" style="display:none; border-color:#4dff88; background:#4dff88; color:#0f172a;">Confirmar Seleção</button>
                     <button onclick="toggleMestre()" style="border-color:#bc8cf2; color:#bc8cf2;">Painel Mestre</button>
                     <button onclick="exportAll()">Exportar Backup</button>
                     <button onclick="document.getElementById('importFile').click()">Importar Backup</button>
@@ -2766,9 +2780,19 @@
             allCharacters.forEach((char, index) => {
                 const card = document.createElement('div');
                 card.className = 'char-card';
-                card.onclick = () => openCharacter(index);
+                if (isSelectingForMesa) {
+                    if (selectedCharIndices.has(index)) card.classList.add('active-for-mesa');
+                    card.onclick = () => {
+                        if (selectedCharIndices.has(index)) selectedCharIndices.delete(index);
+                        else selectedCharIndices.add(index);
+                        renderCharacterGrid();
+                    };
+                } else {
+                    if (selectedCharIndices.has(index)) card.classList.add('active-for-mesa');
+                    card.onclick = () => openCharacter(index);
+                }
                 card.innerHTML = `
-                    <button class="char-card-delete" onclick="event.stopPropagation(); deleteCharacter(${index})">×</button>
+                    <button class="char-card-delete" style="display:${isSelectingForMesa ? 'none' : ''}" onclick="event.stopPropagation(); deleteCharacter(${index})">×</button>
                     <img src="${char.photo || ''}" class="char-card-img" onerror="this.style.display='none'">
                     <div class="char-card-name">${char.name || 'Sem Nome'}</div>
                     <div class="char-card-info">${char.class || 'Classe'} · Nível ${char.level || 1}</div>
@@ -3632,20 +3656,49 @@
         let mesaCodigo = localStorage.getItem('dnd_mesa_codigo') || '';
         let isMestre = false;
         let jogadoresOnline = {};
+        let isSelectingForMesa = false;
+        let selectedCharIndices = new Set();
 
         function initOnline() {
+            if (mqttClient && mqttClient.connected) {
+                // Desconectar
+                mqttClient.end();
+                mqttClient = null;
+                selectedCharIndices.clear();
+                isSelectingForMesa = false;
+                updateOnlineButtonState();
+                renderCharacterGrid();
+                return;
+            }
+
             const codigo = prompt("Digite o Código da Mesa (ex: mesa123):", mesaCodigo);
             if (!codigo) return;
             
             mesaCodigo = codigo;
             localStorage.setItem('dnd_mesa_codigo', codigo);
             
-            if (mqttClient) mqttClient.end();
-            
-            // Usando broker público gratuito (HiveMQ via WebSocket seguro)
-            // Algumas redes bloqueiam a porta 8000, então usamos a porta padrão 443 se disponível
+            // Iniciar modo de seleção
+            isSelectingForMesa = true;
+            selectedCharIndices.clear();
+            document.getElementById('confirm-selection-btn').style.display = 'inline-block';
+            document.getElementById('online-btn').style.display = 'none';
+            renderCharacterGrid();
+            alert("Selecione os personagens que participarão desta mesa e clique em 'Confirmar Seleção'.");
+        }
+
+        function confirmSelection() {
+            if (selectedCharIndices.size === 0) {
+                if (!confirm("Nenhum personagem selecionado. Deseja cancelar a conexão?")) return;
+                isSelectingForMesa = false;
+                document.getElementById('confirm-selection-btn').style.display = 'none';
+                document.getElementById('online-btn').style.display = 'inline-block';
+                renderCharacterGrid();
+                return;
+            }
+
+            // Conectar ao MQTT
             const statusDot = document.getElementById('status-dot');
-            if (statusDot) statusDot.style.background = '#ffd700'; // Amarelo: Tentando...
+            if (statusDot) statusDot.style.background = '#ffd700';
 
             mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
                 keepalive: 60,
@@ -3658,7 +3711,15 @@
                 const statusDot = document.getElementById('status-dot');
                 if (statusDot) statusDot.style.background = '#4dff88';
                 mqttClient.subscribe(`dnd/mesa/${mesaCodigo}/+`);
-                syncPlayerData();
+                
+                // Sincroniza todos os selecionados
+                selectedCharIndices.forEach(idx => syncPlayerData(idx));
+                
+                isSelectingForMesa = false;
+                document.getElementById('confirm-selection-btn').style.display = 'none';
+                document.getElementById('online-btn').style.display = 'inline-block';
+                updateOnlineButtonState();
+                renderCharacterGrid();
                 console.log('Conectado à mesa:', mesaCodigo);
             });
 
@@ -3666,6 +3727,11 @@
                 const statusDot = document.getElementById('status-dot');
                 if (statusDot) statusDot.style.background = '#ff4d4d';
                 console.error('Erro na conexão:', err);
+                alert("Erro ao conectar à mesa. Tente novamente.");
+                isSelectingForMesa = false;
+                document.getElementById('confirm-selection-btn').style.display = 'none';
+                document.getElementById('online-btn').style.display = 'inline-block';
+                renderCharacterGrid();
             });
 
             mqttClient.on('message', (topic, message) => {
@@ -3678,23 +3744,52 @@
             });
         }
 
-        function syncPlayerData() {
-            if (!mqttClient || !mqttClient.connected || currentCharacterIndex === -1) return;
-            const char = allCharacters[currentCharacterIndex];
-            const data = {
-                name: char.name || "Sem Nome",
-                hp: char.hitPoints || 0,
-                hpMax: char.maxHitPoints || 0,
-                tempHP: char.tempHP || 0,
-                ac: char.armorClass || 0,
-                class: char.class || "",
-                level: char.level || 1,
-                photo: char.photo || "",
-                lastUpdate: Date.now()
-            };
-            // Encode seguro para caracteres especiais/acentos
-            const safeId = btoa(unescape(encodeURIComponent(char.name))).replace(/[/+=]/g, '');
-            mqttClient.publish(`dnd/mesa/${mesaCodigo}/${safeId}`, JSON.stringify(data), { retain: true });
+        function updateOnlineButtonState() {
+            const btn = document.getElementById('online-btn');
+            if (mqttClient && mqttClient.connected) {
+                btn.innerText = "🔌 Desconectar Mesa";
+                btn.style.borderColor = "#ffd700";
+                btn.style.color = "#ffd700";
+            } else {
+                btn.innerText = "🌐 Conectar Mesa";
+                btn.style.borderColor = "#4dff88";
+                btn.style.color = "#4dff88";
+            }
+        }
+
+        function syncPlayerData(forcedIndex = null) {
+            if (!mqttClient || !mqttClient.connected) return;
+            
+            // Se um índice for forçado (ex: na conexão), usa ele. 
+            // Caso contrário, usa o personagem aberto, mas apenas se ele estiver na lista de selecionados.
+            let indicesToSync = [];
+            if (forcedIndex !== null) {
+                indicesToSync = [forcedIndex];
+            } else if (currentCharacterIndex !== -1 && selectedCharIndices.has(currentCharacterIndex)) {
+                indicesToSync = [currentCharacterIndex];
+            } else if (currentCharacterIndex === -1) {
+                // Se estiver na tela de seleção, sincroniza todos os selecionados periodicamente
+                indicesToSync = Array.from(selectedCharIndices);
+            }
+
+            indicesToSync.forEach(idx => {
+                const char = allCharacters[idx];
+                if (!char) return;
+                const data = {
+                    name: char.name || "Sem Nome",
+                    hp: char.hitPoints || 0,
+                    hpMax: char.maxHitPoints || 0,
+                    tempHP: char.tempHP || 0,
+                    ac: char.armorClass || 0,
+                    class: char.class || "",
+                    level: char.level || 1,
+                    photo: char.photo || "",
+                    lastUpdate: Date.now()
+                };
+                // Encode seguro para caracteres especiais/acentos
+                const safeId = btoa(unescape(encodeURIComponent(char.name))).replace(/[/+=]/g, '');
+                mqttClient.publish(`dnd/mesa/${mesaCodigo}/${safeId}`, JSON.stringify(data), { retain: true });
+            });
         }
 
         function toggleMestre() {
@@ -3702,7 +3797,10 @@
             const panel = document.getElementById('mestre-panel');
             panel.style.display = isMestre ? 'block' : 'none';
             if (isMestre) {
-                if (!mqttClient) initOnline();
+                if (!mqttClient || !mqttClient.connected) {
+                    const confirmMestre = confirm("Você não está conectado a uma mesa. Deseja conectar agora para usar o Painel do Mestre?");
+                    if (confirmMestre) initOnline();
+                }
                 renderMestrePanel();
             }
         }
