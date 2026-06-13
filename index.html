@@ -3658,6 +3658,18 @@
         let jogadoresOnline = {};
         let isSelectingForMesa = false;
         let selectedCharIndices = new Set();
+        let iamTheMestre = false;
+        let mestreId = null;
+        let hiddenPlayers = new Set();
+        
+        const CONDITIONS = {
+            'Nenhuma': { color: '', emoji: '🛡️' },
+            'Envenenado': { color: '#a855f7', emoji: '🤢' },
+            'Cegueira': { color: '#334155', emoji: '🌑' },
+            'Enfeitiçado': { color: '#ec4899', emoji: '💖' },
+            'Paralisado': { color: '#3b82f6', emoji: '⚡' },
+            'Incendiado': { color: '#f97316', emoji: '🔥' }
+        };
 
         function initOnline() {
             if (mqttClient && mqttClient.connected) {
@@ -3741,9 +3753,23 @@
             mqttClient.on('message', (topic, message) => {
                 try {
                     const data = JSON.parse(message.toString());
-                    const playerId = topic.split('/').pop();
-                    jogadoresOnline[playerId] = data;
-                    if (isMestre) renderMestrePanel();
+                    const parts = topic.split('/');
+                    const lastPart = parts.pop();
+                    
+                    if (lastPart === '_mestre') {
+                        mestreId = data.id;
+                        if (mestreId !== mqttClient.options.clientId) iamTheMestre = false;
+                        renderMestrePanel();
+                    } else if (lastPart === 'cmd') {
+                        // Receber comando do mestre
+                        const playerId = parts.pop();
+                        handleRemoteCommand(playerId, data);
+                    } else {
+                        const playerId = lastPart;
+                        data.id = playerId;
+                        jogadoresOnline[playerId] = data;
+                        if (isMestre) renderMestrePanel();
+                    }
                 } catch(e) { console.error("Erro ao ler mensagem:", e); }
             });
         }
@@ -3764,21 +3790,23 @@
         function syncPlayerData(forcedIndex = null) {
             if (!mqttClient || !mqttClient.connected) return;
             
-            // Se um índice for forçado (ex: na conexão), usa ele. 
-            // Caso contrário, usa o personagem aberto, mas apenas se ele estiver na lista de selecionados.
             let indicesToSync = [];
             if (forcedIndex !== null) {
                 indicesToSync = [forcedIndex];
             } else if (currentCharacterIndex !== -1 && selectedCharIndices.has(currentCharacterIndex)) {
                 indicesToSync = [currentCharacterIndex];
             } else if (currentCharacterIndex === -1) {
-                // Se estiver na tela de seleção, sincroniza todos os selecionados periodicamente
                 indicesToSync = Array.from(selectedCharIndices);
             }
 
             indicesToSync.forEach(idx => {
                 const char = allCharacters[idx];
                 if (!char) return;
+                
+                // Manter estado de visibilidade e condição se já existirem no jogadoresOnline
+                const safeId = btoa(unescape(encodeURIComponent(char.name))).replace(/[/+=]/g, '');
+                const existing = jogadoresOnline[safeId] || {};
+
                 const data = {
                     name: char.name || "Sem Nome",
                     hp: char.hitPoints || 0,
@@ -3788,12 +3816,51 @@
                     class: char.class || "",
                     level: char.level || 1,
                     photo: char.photo || "",
-                    lastUpdate: Date.now()
+                    lastUpdate: Date.now(),
+                    hidden: existing.hidden || false,
+                    condition: existing.condition || 'Nenhuma'
                 };
-                // Encode seguro para caracteres especiais/acentos
-                const safeId = btoa(unescape(encodeURIComponent(char.name))).replace(/[/+=]/g, '');
                 mqttClient.publish(`dnd/mesa/${mesaCodigo}/${safeId}`, JSON.stringify(data), { retain: true });
+                mqttClient.subscribe(`dnd/mesa/${mesaCodigo}/${safeId}/cmd`);
             });
+        }
+
+        function handleRemoteCommand(safeId, cmd) {
+            // Verifica se o personagem local corresponde ao ID
+            const idx = allCharacters.findIndex(c => {
+                const id = btoa(unescape(encodeURIComponent(c.name))).replace(/[/+=]/g, '');
+                return id === safeId;
+            });
+            
+            if (idx === -1) return;
+            
+            const char = allCharacters[idx];
+            if (cmd.type === 'damage') {
+                let damage = cmd.amount;
+                if (char.tempHP > 0) {
+                    if (damage <= char.tempHP) {
+                        char.tempHP -= damage;
+                        damage = 0;
+                    } else {
+                        damage -= char.tempHP;
+                        char.tempHP = 0;
+                    }
+                }
+                char.hitPoints = Math.max(0, char.hitPoints - damage);
+            } else if (cmd.type === 'heal') {
+                char.hitPoints = Math.min(char.maxHitPoints, char.hitPoints + cmd.amount);
+            } else if (cmd.type === 'temp') {
+                char.tempHP = cmd.amount;
+            }
+            
+            saveAll();
+            if (currentCharacterIndex === idx) {
+                updateHPDisplay();
+                // Atualizar campos de input se a ficha estiver aberta
+                document.getElementById('charHP').value = char.hitPoints;
+                document.getElementById('charTempHP').value = char.tempHP;
+            }
+            console.log(`Comando remoto recebido: ${cmd.type} de ${cmd.amount}`);
         }
 
         function toggleMestre() {
@@ -3815,38 +3882,152 @@
             
             const agora = Date.now();
             Object.values(jogadoresOnline).forEach(p => {
-                // Remove jogadores inativos por mais de 10 minutos (600.000ms)
                 if (agora - (p.lastUpdate || 0) > 600000) return;
+                
+                // Se não for o mestre e o jogador estiver escondido, não renderiza
+                if (!iamTheMestre && p.hidden) return;
 
                 const card = document.createElement('div');
                 card.className = 'mestre-card';
-                card.style.display = 'flex';
-                card.style.gap = '10px';
-                card.style.alignItems = 'center';
+                if (p.hidden) card.style.opacity = '0.6';
 
                 const hpPercent = (p.hp / p.hpMax) * 100;
-                const hpColor = hpPercent > 50 ? '#4dff88' : (hpPercent > 20 ? '#ffd700' : '#ff4d4d');
+                let hpColor = hpPercent > 50 ? '#4dff88' : (hpPercent > 20 ? '#ffd700' : '#ff4d4d');
+                
+                // Sobrescrever cor se houver condição
+                if (p.condition && CONDITIONS[p.condition] && CONDITIONS[p.condition].color) {
+                    hpColor = CONDITIONS[p.condition].color;
+                }
+
                 const tempHPText = p.tempHP > 0 ? `<span style="color:#58a6ff"> (+${p.tempHP})</span>` : '';
+                const conditionEmoji = p.condition && CONDITIONS[p.condition] ? CONDITIONS[p.condition].emoji : '';
                 
                 card.innerHTML = `
-                    <img src="${p.photo || ''}" style="width:45px; height:45px; border-radius:4px; object-fit:cover; border:1px solid var(--accent-color); background:var(--card-bg);" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%23334155%22/><text x=%2250%%22 y=%2250%%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22white%22 font-size=%2240%22>?</text></svg>'">
-                    <div style="flex:1">
-                        <div style="font-weight:bold; color:var(--accent-color); font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                            ${p.name} <small style="color:#64748b; font-weight:normal;">Nív ${p.level || 1} ${p.class || ''}</small>
+                    <div class="mestre-card-main">
+                        <div class="mestre-card-photo-container">
+                            <img src="${p.photo || ''}" class="mestre-card-photo" style="border-color:${hpColor}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%23334155%22/><text x=%2250%%22 y=%2250%%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22white%22 font-size=%2240%22>?</text></svg>'">
+                            ${iamTheMestre ? `<div class="visibility-toggle" onclick="togglePlayerVisibility('${p.id}')">${p.hidden ? '👁️‍🗨️' : '👁️'}</div>` : ''}
                         </div>
-                        <div style="display:flex; justify-content:space-between; margin-top:3px; font-size:11px;">
-                            <span>HP: ${p.hp}/${p.hpMax}${tempHPText}</span>
-                            <span>🛡️ ${p.ac}</span>
-                        </div>
-                        <div style="width:100%; height:5px; background:#334155; border-radius:3px; margin-top:4px; overflow:hidden; position:relative;">
-                            <div style="width:${Math.min(100, hpPercent)}%; height:100%; background:${hpColor}; transition: width 0.3s;"></div>
-                            ${p.tempHP > 0 ? `<div style="position:absolute; top:0; left:0; width:${Math.min(100, (p.tempHP / p.hpMax) * 100)}%; height:100%; background:rgba(88, 166, 255, 0.5); border-right:1px solid #58a6ff;"></div>` : ''}
+                        <div style="flex:1">
+                            <div style="font-weight:bold; color:${hpColor}; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                ${conditionEmoji} ${p.name} <small style="color:#64748b; font-weight:normal;">Nív ${p.level || 1} ${p.class || ''}</small>
+                            </div>
+                            <div style="display:flex; justify-content:space-between; margin-top:3px; font-size:11px;">
+                                <span>HP: ${p.hp}/${p.hpMax}${tempHPText}</span>
+                                <div style="display:flex; align-items:center; gap:5px;">
+                                    ${iamTheMestre ? `<select class="condition-select" onchange="setPlayerCondition('${p.id}', this.value)">
+                                        ${Object.keys(CONDITIONS).map(c => `<option value="${c}" ${p.condition === c ? 'selected' : ''}>${c}</option>`).join('')}
+                                    </select>` : (p.condition && p.condition !== 'Nenhuma' ? `<span class="condition-badge" style="background:${hpColor}">${p.condition}</span>` : '')}
+                                    <span>🛡️ ${p.ac}</span>
+                                </div>
+                            </div>
+                            <div style="width:100%; height:5px; background:#334155; border-radius:3px; margin-top:4px; overflow:hidden; position:relative;">
+                                <div style="width:${Math.min(100, hpPercent)}%; height:100%; background:${hpColor}; transition: width 0.3s;"></div>
+                                ${p.tempHP > 0 ? `<div style="position:absolute; top:0; left:0; width:${Math.min(100, (p.tempHP / p.hpMax) * 100)}%; height:100%; background:rgba(88, 166, 255, 0.5); border-right:1px solid #58a6ff;"></div>` : ''}
+                            </div>
                         </div>
                     </div>
+                    ${iamTheMestre ? `
+                    <div class="mestre-hp-hub">
+                        <div class="mestre-hp-controls">
+                            <input type="text" id="hp-val-${p.id}" placeholder="1d6+5">
+                            <button onclick="remoteHPAction('${p.id}', 'damage')" style="background:#ff4d4d; border-color:#ff4d4d; color:white;">Dano</button>
+                            <button onclick="remoteHPAction('${p.id}', 'heal')" style="background:#4dff88; border-color:#4dff88; color:#0f172a;">Cura</button>
+                            <button onclick="remoteHPAction('${p.id}', 'temp')" style="background:#58a6ff; border-color:#58a6ff; color:white;">Temp</button>
+                        </div>
+                    </div>` : ''}
                 `;
                 list.appendChild(card);
             });
             document.getElementById('mesa-display').innerText = mesaCodigo;
+            
+            // Atualizar botão de coroa
+            const crownBtn = document.getElementById('mestre-crown-btn');
+            if (mestreId && mestreId !== mqttClient.options.clientId) {
+                crownBtn.style.display = 'none';
+            } else {
+                crownBtn.style.display = 'flex';
+                crownBtn.className = iamTheMestre ? 'crown-btn active' : 'crown-btn';
+            }
+        }
+
+        function toggleIamMestre() {
+            if (!mqttClient || !mqttClient.connected) return;
+            iamTheMestre = !iamTheMestre;
+            const myId = mqttClient.options.clientId;
+            
+            if (iamTheMestre) {
+                mestreId = myId;
+                mqttClient.publish(`dnd/mesa/${mesaCodigo}/_mestre`, JSON.stringify({ id: myId }), { retain: true });
+            } else {
+                mestreId = null;
+                mqttClient.publish(`dnd/mesa/${mesaCodigo}/_mestre`, JSON.stringify({ id: null }), { retain: true });
+            }
+            renderMestrePanel();
+        }
+
+        function togglePlayerVisibility(playerId) {
+            const p = jogadoresOnline[playerId];
+            if (!p) return;
+            p.hidden = !p.hidden;
+            mqttClient.publish(`dnd/mesa/${mesaCodigo}/${playerId}`, JSON.stringify(p), { retain: true });
+        }
+
+        function setPlayerCondition(playerId, condition) {
+            const p = jogadoresOnline[playerId];
+            if (!p) return;
+            p.condition = condition;
+            mqttClient.publish(`dnd/mesa/${mesaCodigo}/${playerId}`, JSON.stringify(p), { retain: true });
+        }
+
+        function parseDice(str) {
+            str = str.toLowerCase().replace(/\s/g, '');
+            if (!str.includes('d')) return parseInt(str) || 0;
+            
+            const parts = str.split(/([+-])/);
+            let total = 0;
+            let currentOp = '+';
+            
+            for (let part of parts) {
+                if (part === '+' || part === '-') {
+                    currentOp = part;
+                    continue;
+                }
+                
+                let val = 0;
+                if (part.includes('d')) {
+                    const [num, sides] = part.split('d').map(n => parseInt(n) || 1);
+                    for (let i = 0; i < num; i++) {
+                        val += Math.floor(Math.random() * sides) + 1;
+                    }
+                } else {
+                    val = parseInt(part) || 0;
+                }
+                
+                if (currentOp === '+') total += val;
+                else total -= val;
+            }
+            return total;
+        }
+
+        function remoteHPAction(playerId, type) {
+            const input = document.getElementById(`hp-val-${playerId}`);
+            const valStr = input.value.trim();
+            if (!valStr) return;
+            
+            const amount = parseDice(valStr);
+            const p = jogadoresOnline[playerId];
+            if (!p) return;
+
+            // Enviar comando remoto via MQTT
+            mqttClient.publish(`dnd/mesa/${mesaCodigo}/${playerId}/cmd`, JSON.stringify({
+                type: type,
+                amount: amount,
+                from: 'mestre'
+            }));
+            
+            input.value = '';
+            alert(`${type === 'damage' ? 'Dano' : type === 'heal' ? 'Cura' : 'HP Temp'} de ${amount} enviado para ${p.name}!`);
         }
 
         // Hook no saveAll original para disparar o sync
@@ -3925,6 +4106,7 @@
         <div id="mestre-panel-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; cursor: move; user-select: none; padding-bottom: 5px; border-bottom: 1px solid var(--border-color);">
             <div style="display:flex; align-items:center; gap:8px;">
                 <div id="status-dot" style="width:8px; height:8px; border-radius:50%; background:#64748b;"></div>
+                <div id="mestre-crown-btn" class="crown-btn" onclick="toggleIamMestre()" title="Tornar-se Mestre">👑</div>
                 <strong style="color:var(--accent-color)">Painel do Mestre</strong>
             </div>
             <button onclick="toggleMestre()" style="padding:2px 8px; font-size:10px;">X</button>
@@ -3940,10 +4122,129 @@
 
     <style>
         .mestre-card {
-            background: var(--bg-color);
+            background: rgba(15, 23, 42, 0.6);
             border: 1px solid var(--border-color);
             border-radius: 8px;
             padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            transition: all 0.3s ease;
+        }
+
+        .mestre-card-main {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+        }
+
+        .mestre-card-photo-container {
+            position: relative;
+            width: 45px;
+            height: 45px;
+            flex-shrink: 0;
+        }
+
+        .mestre-card-photo {
+            width: 45px;
+            height: 45px;
+            border-radius: 4px;
+            object-fit: cover;
+            border: 1px solid var(--accent-color);
+            background: var(--card-bg);
+        }
+
+        .visibility-toggle {
+            position: absolute;
+            bottom: -5px;
+            left: -5px;
+            width: 20px;
+            height: 20px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            cursor: pointer;
+            z-index: 2;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        }
+
+        .crown-btn {
+            width: 22px;
+            height: 22px;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .crown-btn.active {
+            background: #ffd700;
+            border-color: #b8860b;
+            color: #000;
+        }
+
+        .condition-badge {
+            font-size: 9px;
+            padding: 1px 4px;
+            border-radius: 3px;
+            color: white;
+            margin-left: 5px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .mestre-hp-hub {
+            margin-top: 5px;
+            padding-top: 8px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .mestre-hp-controls {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .mestre-hp-controls input {
+            width: 60px;
+            height: 28px;
+            font-size: 12px;
+            background: rgba(0,0,0,0.4);
+            border: 1px solid var(--border-color);
+            color: white;
+            border-radius: 4px;
+            padding: 0 6px;
+            text-align: center;
+        }
+
+        .mestre-hp-controls button {
+            padding: 4px 8px;
+            font-size: 11px;
+            height: 28px;
+            flex: 1;
+        }
+
+        .condition-select {
+            font-size: 10px;
+            background: rgba(0,0,0,0.4);
+            border: 1px solid var(--border-color);
+            color: #ccc;
+            border-radius: 4px;
+            padding: 2px 5px;
+            cursor: pointer;
         }
         #mestre-list::-webkit-scrollbar { width: 4px; }
         #mestre-list::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 10px; }
