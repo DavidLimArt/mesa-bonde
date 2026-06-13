@@ -3661,14 +3661,10 @@
         let iamTheMestre = false;
         let mestreId = null;
         let hiddenPlayers = new Set();
+        let expandedPlayers = new Set();
         
-        const CONDITIONS = {
-            'Nenhuma': { color: '', emoji: '🛡️' },
-            'Envenenado': { color: '#a855f7', emoji: '🤢' },
-            'Cegueira': { color: '#334155', emoji: '🌑' },
-            'Enfeitiçado': { color: '#ec4899', emoji: '💖' },
-            'Paralisado': { color: '#3b82f6', emoji: '⚡' },
-            'Incendiado': { color: '#f97316', emoji: '🔥' }
+        let CUSTOM_CONDITIONS = {
+            'Nenhuma': { color: '', emoji: '🛡️' }
         };
 
         function initOnline() {
@@ -3727,6 +3723,8 @@
                 const statusDot = document.getElementById('status-dot');
                 if (statusDot) statusDot.style.background = '#4dff88';
                 mqttClient.subscribe(`dnd/mesa/${mesaCodigo}/+`);
+                mqttClient.subscribe(`dnd/mesa/${mesaCodigo}/_mestre`);
+                mqttClient.subscribe(`dnd/mesa/${mesaCodigo}/_mestre_heartbeat`);
                 
                 // Sincroniza todos os selecionados
                 selectedCharIndices.forEach(idx => syncPlayerData(idx));
@@ -3759,7 +3757,12 @@
                     if (lastPart === '_mestre') {
                         mestreId = data.id;
                         if (mestreId !== mqttClient.options.clientId) iamTheMestre = false;
+                        if (mestreId) lastMestreHeartbeat = Date.now();
                         renderMestrePanel();
+                    } else if (lastPart === '_mestre_heartbeat') {
+                        if (data.id === mestreId) {
+                            lastMestreHeartbeat = Date.now();
+                        }
                     } else if (lastPart === 'cmd') {
                         // Receber comando do mestre
                         const playerId = parts.pop();
@@ -3803,7 +3806,6 @@
                 const char = allCharacters[idx];
                 if (!char) return;
                 
-                // Manter estado de visibilidade e condição se já existirem no jogadoresOnline
                 const safeId = btoa(unescape(encodeURIComponent(char.name))).replace(/[/+=]/g, '');
                 const existing = jogadoresOnline[safeId] || {};
 
@@ -3818,7 +3820,8 @@
                     photo: char.photo || "",
                     lastUpdate: Date.now(),
                     hidden: existing.hidden || false,
-                    condition: existing.condition || 'Nenhuma'
+                    condition: existing.condition || 'Nenhuma',
+                    conditionColor: existing.conditionColor || ''
                 };
                 mqttClient.publish(`dnd/mesa/${mesaCodigo}/${safeId}`, JSON.stringify(data), { retain: true });
                 mqttClient.subscribe(`dnd/mesa/${mesaCodigo}/${safeId}/cmd`);
@@ -3883,41 +3886,40 @@
             const agora = Date.now();
             Object.values(jogadoresOnline).forEach(p => {
                 if (agora - (p.lastUpdate || 0) > 600000) return;
-                
-                // Se não for o mestre e o jogador estiver escondido, não renderiza
                 if (!iamTheMestre && p.hidden) return;
 
                 const card = document.createElement('div');
                 card.className = 'mestre-card';
                 if (p.hidden) card.style.opacity = '0.6';
+                if (iamTheMestre) card.style.cursor = 'pointer';
+                
+                const isExpanded = expandedPlayers.has(p.id);
 
                 const hpPercent = (p.hp / p.hpMax) * 100;
                 let hpColor = hpPercent > 50 ? '#4dff88' : (hpPercent > 20 ? '#ffd700' : '#ff4d4d');
                 
                 // Sobrescrever cor se houver condição
-                if (p.condition && CONDITIONS[p.condition] && CONDITIONS[p.condition].color) {
-                    hpColor = CONDITIONS[p.condition].color;
+                if (p.condition && p.conditionColor) {
+                    hpColor = p.conditionColor;
                 }
 
                 const tempHPText = p.tempHP > 0 ? `<span style="color:#58a6ff"> (+${p.tempHP})</span>` : '';
-                const conditionEmoji = p.condition && CONDITIONS[p.condition] ? CONDITIONS[p.condition].emoji : '';
+                const conditionEmoji = p.condition && p.condition !== 'Nenhuma' ? '⚠️ ' : '';
                 
                 card.innerHTML = `
-                    <div class="mestre-card-main">
+                    <div class="mestre-card-main" onclick="${iamTheMestre ? `toggleExpandPlayer('${p.id}')` : ''}">
                         <div class="mestre-card-photo-container">
                             <img src="${p.photo || ''}" class="mestre-card-photo" style="border-color:${hpColor}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%23334155%22/><text x=%2250%%22 y=%2250%%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22white%22 font-size=%2240%22>?</text></svg>'">
-                            ${iamTheMestre ? `<div class="visibility-toggle" onclick="togglePlayerVisibility('${p.id}')">${p.hidden ? '👁️‍🗨️' : '👁️'}</div>` : ''}
+                            ${iamTheMestre ? `<div class="visibility-toggle" onclick="event.stopPropagation(); togglePlayerVisibility('${p.id}')">${p.hidden ? '👁️‍🗨️' : '👁️'}</div>` : ''}
                         </div>
                         <div style="flex:1">
                             <div style="font-weight:bold; color:${hpColor}; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                                ${conditionEmoji} ${p.name} <small style="color:#64748b; font-weight:normal;">Nív ${p.level || 1} ${p.class || ''}</small>
+                                ${conditionEmoji}${p.name} <small style="color:#64748b; font-weight:normal;">Nív ${p.level || 1} ${p.class || ''}</small>
                             </div>
                             <div style="display:flex; justify-content:space-between; margin-top:3px; font-size:11px;">
                                 <span>HP: ${p.hp}/${p.hpMax}${tempHPText}</span>
                                 <div style="display:flex; align-items:center; gap:5px;">
-                                    ${iamTheMestre ? `<select class="condition-select" onchange="setPlayerCondition('${p.id}', this.value)">
-                                        ${Object.keys(CONDITIONS).map(c => `<option value="${c}" ${p.condition === c ? 'selected' : ''}>${c}</option>`).join('')}
-                                    </select>` : (p.condition && p.condition !== 'Nenhuma' ? `<span class="condition-badge" style="background:${hpColor}">${p.condition}</span>` : '')}
+                                    ${p.condition && p.condition !== 'Nenhuma' ? `<span class="condition-badge" style="background:${hpColor}">${p.condition}</span>` : ''}
                                     <span>🛡️ ${p.ac}</span>
                                 </div>
                             </div>
@@ -3927,10 +3929,14 @@
                             </div>
                         </div>
                     </div>
-                    ${iamTheMestre ? `
+                    ${iamTheMestre && isExpanded ? `
                     <div class="mestre-hp-hub">
+                        <div style="display:flex; gap:5px; align-items:center;">
+                            <button onclick="promptCustomCondition('${p.id}')" style="font-size:9px; padding:2px 5px; flex:1;">➕ Condição</button>
+                            <button onclick="setPlayerCondition('${p.id}', 'Nenhuma', '')" style="font-size:9px; padding:2px 5px; background:#475569; border-color:#475569;">Limpar</button>
+                        </div>
                         <div class="mestre-hp-controls">
-                            <input type="text" id="hp-val-${p.id}" placeholder="1d6+5">
+                            <input type="text" id="hp-val-${p.id}" placeholder="1d6+5" onclick="event.stopPropagation()">
                             <button onclick="remoteHPAction('${p.id}', 'damage')" style="background:#ff4d4d; border-color:#ff4d4d; color:white;">Dano</button>
                             <button onclick="remoteHPAction('${p.id}', 'heal')" style="background:#4dff88; border-color:#4dff88; color:#0f172a;">Cura</button>
                             <button onclick="remoteHPAction('${p.id}', 'temp')" style="background:#58a6ff; border-color:#58a6ff; color:white;">Temp</button>
@@ -3941,7 +3947,6 @@
             });
             document.getElementById('mesa-display').innerText = mesaCodigo;
             
-            // Atualizar botão de coroa
             const crownBtn = document.getElementById('mestre-crown-btn');
             if (mestreId && mestreId !== mqttClient.options.clientId) {
                 crownBtn.style.display = 'none';
@@ -3951,20 +3956,77 @@
             }
         }
 
+        function toggleExpandPlayer(playerId) {
+            if (expandedPlayers.has(playerId)) expandedPlayers.delete(playerId);
+            else expandedPlayers.add(playerId);
+            renderMestrePanel();
+        }
+
+        function promptCustomCondition(playerId) {
+            const name = prompt("Nome da Condição (ex: Envenenado, Sangrando):");
+            if (!name) return;
+            const color = prompt("Cor da Condição (Hex, ex: #ff0000 para vermelho):", "#ff0000");
+            if (!color) return;
+            setPlayerCondition(playerId, name, color);
+        }
+
+        function setPlayerCondition(playerId, condition, color) {
+            const p = jogadoresOnline[playerId];
+            if (!p) return;
+            p.condition = condition;
+            p.conditionColor = color;
+            mqttClient.publish(`dnd/mesa/${mesaCodigo}/${playerId}`, JSON.stringify(p), { retain: true });
+        }
+
         function toggleIamMestre() {
             if (!mqttClient || !mqttClient.connected) return;
-            iamTheMestre = !iamTheMestre;
+            
             const myId = mqttClient.options.clientId;
             
-            if (iamTheMestre) {
+            if (!iamTheMestre) {
+                // Tentar assumir o papel de mestre
+                if (mestreId && mestreId !== myId) {
+                    alert("Já existe um mestre nesta mesa!");
+                    return;
+                }
+                
+                iamTheMestre = true;
                 mestreId = myId;
-                mqttClient.publish(`dnd/mesa/${mesaCodigo}/_mestre`, JSON.stringify({ id: myId }), { retain: true });
+                
+                // Publicar que eu sou o mestre com RETAIN
+                mqttClient.publish(`dnd/mesa/${mesaCodigo}/_mestre`, JSON.stringify({ id: myId }), { retain: true, qos: 1 });
+                
+                // Configurar um aviso de saída (Will) não é possível dinamicamente no MQTT.js sem reconectar.
+                // Então vamos usar o evento 'unload' e uma estratégia de "batida de coração" (heartbeat) curta.
+                console.log("Agora você é o mestre.");
             } else {
+                // Abdicar
+                iamTheMestre = false;
                 mestreId = null;
-                mqttClient.publish(`dnd/mesa/${mesaCodigo}/_mestre`, JSON.stringify({ id: null }), { retain: true });
+                mqttClient.publish(`dnd/mesa/${mesaCodigo}/_mestre`, JSON.stringify({ id: null }), { retain: true, qos: 1 });
+                console.log("Você não é mais o mestre.");
             }
             renderMestrePanel();
         }
+
+        // Heartbeat do mestre: se o mestre parar de enviar, a coroa cai
+        setInterval(() => {
+            if (iamTheMestre && mqttClient && mqttClient.connected) {
+                mqttClient.publish(`dnd/mesa/${mesaCodigo}/_mestre_heartbeat`, JSON.stringify({ id: mqttClient.options.clientId, ts: Date.now() }));
+            }
+        }, 5000);
+
+        // Monitorar heartbeat do mestre (para todos os jogadores)
+        let lastMestreHeartbeat = 0;
+        setInterval(() => {
+            if (mestreId && lastMestreHeartbeat > 0 && Date.now() - lastMestreHeartbeat > 15000) {
+                // Mestre sumiu por mais de 15 segundos
+                console.log("Mestre desconectado. Liberando coroa...");
+                mestreId = null;
+                if (iamTheMestre) iamTheMestre = false;
+                renderMestrePanel();
+            }
+        }, 5000);
 
         function togglePlayerVisibility(playerId) {
             const p = jogadoresOnline[playerId];
@@ -4047,11 +4109,19 @@
         // Função de Reset do Painel
         function resetMestrePanel() {
             jogadoresOnline = {};
-            renderMestrePanel();
+            expandedPlayers.clear();
+            
+            // Se eu era o mestre ou ao reiniciar a página, revogamos o título
             if (mqttClient && mqttClient.connected) {
-                // Força uma nova subscrição para tentar captar quem está online com retain
+                if (iamTheMestre) {
+                    mqttClient.publish(`dnd/mesa/${mesaCodigo}/_mestre`, JSON.stringify({ id: null }), { retain: true });
+                }
                 mqttClient.subscribe(`dnd/mesa/${mesaCodigo}/+`);
             }
+            
+            iamTheMestre = false;
+            mestreId = null;
+            renderMestrePanel();
         }
 
         // Função para tornar o painel arrastável
@@ -4097,9 +4167,13 @@
         });
 
         // Limpar dados ao fechar ou recarregar a página
-        window.onbeforeunload = function() {
+        window.addEventListener('beforeunload', function() {
+            if (iamTheMestre && mqttClient && mqttClient.connected) {
+                // Tenta avisar que a coroa está livre antes de fechar
+                mqttClient.publish(`dnd/mesa/${mesaCodigo}/_mestre`, JSON.stringify({ id: null }), { retain: true, qos: 1 });
+            }
             if (mqttClient) mqttClient.end();
-        };
+        });
     </script>
     <!-- UI DO PAINEL DO MESTRE -->
     <div id="mestre-panel" style="display:none; position:fixed; top:20px; right:20px; width:280px; background:var(--card-bg); border:2px solid var(--accent-color); border-radius:12px; padding:15px; z-index:9999; box-shadow: 0 10px 30px rgba(0,0,0,0.5); cursor: default;">
