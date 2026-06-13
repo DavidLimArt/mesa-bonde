@@ -237,8 +237,8 @@
             border: 1px solid var(--border-color);
             padding: 30px;
             border-radius: 12px;
-            width: 90%;
-            max-width: 500px;
+            width: 95%;
+            max-width: 800px;
             box-shadow: 0 20px 40px rgba(0,0,0,0.5);
         }
 
@@ -473,6 +473,13 @@
             background: transparent;
             border: none;
             padding: 0;
+        }
+
+        .ficha-attr-modifier-small {
+            font-size: 16px;
+            font-weight: 700;
+            min-width: 35px;
+            text-align: center;
         }
 
         /* Combate */
@@ -1059,10 +1066,10 @@
 
         /* Create Modal with Point Buy Side by Side */
         .create-modal-wrapper {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
+            display: flex;
+            flex-direction: column;
             gap: 20px;
-            max-width: 1400px;
+            max-width: 100%;
             max-height: 90vh;
             overflow-y: auto;
         }
@@ -1071,6 +1078,7 @@
             display: flex;
             flex-direction: column;
             gap: 15px;
+            flex: 1;
         }
 
         .pointbuy-section {
@@ -1081,8 +1089,7 @@
             background: var(--card-bg);
             border: 1px solid var(--border-color);
             border-radius: 8px;
-            max-height: 600px;
-            overflow-y: auto;
+            width: 100%;
         }
 
         .pointbuy-section h3 {
@@ -1098,11 +1105,14 @@
         }
 
         .pointbuy-stats-table th {
-            background: var(--accent-color);
-            color: var(--bg-color);
-            padding: 6px 4px;
+            background: rgba(88, 166, 255, 0.2);
+            color: var(--accent-color);
+            padding: 8px 4px;
             text-align: left;
-            font-weight: 600;
+            font-weight: 700;
+            font-size: 12px;
+            text-transform: uppercase;
+            border-bottom: 2px solid var(--border-color);
         }
 
         .pointbuy-stats-table td {
@@ -1111,9 +1121,10 @@
         }
 
         .pointbuy-stats-table input {
-            width: 40px;
-            padding: 2px 4px;
-            font-size: 11px;
+            width: 50px;
+            padding: 4px 6px;
+            font-size: 14px;
+            text-align: center;
         }
 
         .pointbuy-info {
@@ -1737,12 +1748,13 @@
     <div id="createModal" class="modal">
         <div class="modal-content">
             <h2 class="modal-title">✨ Novo Personagem</h2>
-            <div class="form-group">
-                <label>Nome do Personagem</label>
-                <input type="text" id="newCharName" placeholder="Ex: Aragorn">
-            </div>
+            
             <div id="createModalWrapper" class="create-modal-wrapper">
                 <div class="create-form-section">
+                    <div class="form-group">
+                        <label>Nome do Personagem</label>
+                        <input type="text" id="newCharName" placeholder="Ex: Aragorn">
+                    </div>
                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
                         <div class="form-group">
                             <label>Classe</label>
@@ -1753,16 +1765,23 @@
                             <input type="number" id="newCharLevel" value="1" min="1" max="20">
                         </div>
                     </div>
+                    <div class="form-group">
+                        <label>Foto (Opcional)</label>
+                        <input type="file" id="newCharPhoto" accept="image/*">
+                    </div>
                 </div>
+
                 <div class="pointbuy-section" id="pointBuyPanel">
                     <h3>📊 Calculador de Atributos (Point Buy)</h3>
-                    <div class="form-group">
-                        <label style="font-size:11px;">Raça</label>
-                        <select id="pbRaceSelect" style="width:100%; padding:6px; font-size:11px; background:var(--bg-color); border:1px solid var(--border-color); border-radius:4px; color:var(--text-color);"></select>
-                    </div>
-                    <div class="form-group">
-                        <label style="font-size:11px;">Limite de Pontos</label>
-                        <input type="number" id="pbLimitInput" value="27" min="1" style="font-size:11px;">
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                        <div class="form-group">
+                            <label style="font-size:11px;">Raça</label>
+                            <select id="pbRaceSelect" style="width:100%; padding:6px; font-size:11px; background:var(--bg-color); border:1px solid var(--border-color); border-radius:4px; color:var(--text-color);"></select>
+                        </div>
+                        <div class="form-group">
+                            <label style="font-size:11px;">Limite de Pontos</label>
+                            <input type="number" id="pbLimitInput" value="27" min="1" style="font-size:11px;">
+                        </div>
                     </div>
                     <table class="pointbuy-stats-table" id="pbStatsTable"></table>
                     <div class="pointbuy-info">
@@ -1770,10 +1789,6 @@
                         <button onclick="resetPointBuy()" style="padding:4px 8px; font-size:10px;">Resetar</button>
                     </div>
                 </div>
-            </div>
-            <div class="form-group">
-                <label>Foto (Opcional)</label>
-                <input type="file" id="newCharPhoto" accept="image/*">
             </div>
             <div class="modal-footer">
                 <button onclick="closeCreateModal()">Cancelar</button>
@@ -4708,7 +4723,20 @@
         function renderPointBuyTable() {
             const tbody = document.getElementById('pbStatsTable');
             if (!tbody) return;
-            tbody.innerHTML = '';
+            tbody.innerHTML = `
+                <thead>
+                    <tr>
+                        <th style="text-align:left;">Atributo</th>
+                        <th style="text-align:center;">Base</th>
+                        <th style="text-align:center;">Raça</th>
+                        <th style="text-align:center;">Total</th>
+                        <th style="text-align:center;">Mod</th>
+                        <th style="text-align:center;">Custo</th>
+                    </tr>
+                </thead>
+                <tbody id="pbStatsTableBody"></tbody>
+            `;
+            const tableBody = document.getElementById('pbStatsTableBody');
             let totalUsed = 0;
 
             const currentRaceBonus = pbRacesData[pbState.race] || {};
@@ -4723,14 +4751,14 @@
 
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td style="font-weight:bold; color:var(--accent-color);">${attr.name}</td>
-                    <td style="text-align:center;"><input type="number" value="${base}" min="8" max="15" onchange="pbUpdateScore('${attr.id}', this.value)" style="width:35px;"></td>
-                    <td style="text-align:center;">${racial > 0 ? '+' + racial : racial < 0 ? racial : '0'}</td>
-                    <td style="text-align:center; font-weight:bold; color:var(--accent-color);">${total}</td>
-                    <td style="text-align:center; color:#4dff88;">${mod >= 0 ? '+' + mod : mod}</td>
-                    <td style="text-align:center;">${cost}</td>
+                    <td style="font-weight:bold; color:var(--accent-color); font-size:14px;">${attr.name}</td>
+                    <td style="text-align:center;"><input type="number" value="${base}" min="8" max="15" onchange="pbUpdateScore('${attr.id}', this.value)"></td>
+                    <td style="text-align:center; font-size:14px;">${racial > 0 ? '+' + racial : racial < 0 ? racial : '0'}</td>
+                    <td style="text-align:center; font-weight:bold; color:var(--accent-color); font-size:16px;">${total}</td>
+                    <td style="text-align:center; color:#4dff88; font-weight:bold; font-size:14px;">${mod >= 0 ? '+' + mod : mod}</td>
+                    <td style="text-align:center; font-size:14px;">${cost}</td>
                 `;
-                tbody.appendChild(row);
+                tableBody.appendChild(row);
             });
 
             const usedSpan = document.getElementById('pbUsedPoints');
@@ -4881,9 +4909,10 @@
                 });
             }
 
+            const selectedRace = pbState ? pbState.race : '';
             const newChar = {
                 name, class: charClass, level, photo: photoData,
-                playerName: '', race: '', background: '', alignment: '',
+                playerName: '', race: selectedRace !== 'none' ? selectedRace : '', background: '', alignment: '',
                 attributes: JSON.parse(JSON.stringify(ATTRIBUTE_DEFAULTS)),
                 skills: JSON.parse(JSON.stringify(SKILL_DEFAULTS)),
                 hitPoints: 10, maxHitPoints: 10, tempHP: 0,
