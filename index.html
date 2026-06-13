@@ -2774,6 +2774,13 @@
             showWbElementMenu({ pageX: 200, pageY: 200, preventDefault: ()=>{} }, wbSelectedElement);
         }
 
+        // Prevenir travamentos de modais e garantir fechamento ao clicar fora
+        window.addEventListener('click', function(event) {
+            if (event.target.classList.contains('modal') || event.target.classList.contains('condition-modal')) {
+                event.target.style.display = "none";
+            }
+        });
+
         // ===== ESTADO GLOBAL =====
         let allCharacters = [];
         let currentCharacterIndex = -1;
@@ -4324,43 +4331,50 @@
             }
         }
 
+        // Debounce para evitar sobrecarga no MQTT em atualizações rápidas
+        let syncTimeout = null;
         function syncPlayerData(forcedIndex = null) {
             if (!mqttClient || !mqttClient.connected) return;
             
-            let indicesToSync = [];
-            if (forcedIndex !== null) {
-                indicesToSync = [forcedIndex];
-            } else if (currentCharacterIndex !== -1 && selectedCharIndices.has(currentCharacterIndex)) {
-                indicesToSync = [currentCharacterIndex];
-            } else if (currentCharacterIndex === -1) {
-                indicesToSync = Array.from(selectedCharIndices);
-            }
+            if (syncTimeout) clearTimeout(syncTimeout);
+            
+            syncTimeout = setTimeout(() => {
+                let indicesToSync = [];
+                if (forcedIndex !== null) {
+                    indicesToSync = [forcedIndex];
+                } else if (currentCharacterIndex !== -1 && selectedCharIndices.has(currentCharacterIndex)) {
+                    indicesToSync = [currentCharacterIndex];
+                } else if (currentCharacterIndex === -1) {
+                    indicesToSync = Array.from(selectedCharIndices);
+                }
 
-            indicesToSync.forEach(idx => {
-                const char = allCharacters[idx];
-                if (!char) return;
-                
-                const safeId = btoa(unescape(encodeURIComponent(char.name))).replace(/[/+=]/g, '');
-                const existing = jogadoresOnline[safeId] || {};
+                indicesToSync.forEach(idx => {
+                    const char = allCharacters[idx];
+                    if (!char) return;
+                    
+                    const safeId = btoa(unescape(encodeURIComponent(char.name))).replace(/[/+=]/g, '');
+                    const existing = jogadoresOnline[safeId] || {};
 
-                const data = {
-                    name: char.name || "Sem Nome",
-                    hp: char.hitPoints || 0,
-                    hpMax: char.maxHitPoints || 0,
-                    tempHP: char.tempHP || 0,
-                    ac: char.armorClass || 0,
-                    class: char.class || "",
-                    level: char.level || 1,
-                    photo: char.photo || "",
-                    items: char.items || [],
-                    lastUpdate: Date.now(),
-                    hidden: existing.hidden || false,
-                    condition: existing.condition || 'Nenhuma',
-                    conditionColor: existing.conditionColor || ''
-                };
-                mqttClient.publish(`dnd/mesa/${mesaCodigo}/${safeId}`, JSON.stringify(data), { retain: true });
-                mqttClient.subscribe(`dnd/mesa/${mesaCodigo}/${safeId}/cmd`);
-            });
+                    const data = {
+                        name: char.name || "Sem Nome",
+                        hp: char.hitPoints || 0,
+                        hpMax: char.maxHitPoints || 0,
+                        tempHP: char.tempHP || 0,
+                        ac: char.armorClass || 0,
+                        class: char.class || "",
+                        level: char.level || 1,
+                        photo: char.photo || "",
+                        items: char.items || [],
+                        lastUpdate: Date.now(),
+                        hidden: existing.hidden || false,
+                        condition: existing.condition || 'Nenhuma',
+                        conditionColor: existing.conditionColor || ''
+                    };
+                    // QoS 0 para maior velocidade (quase instantâneo)
+                    mqttClient.publish(`dnd/mesa/${mesaCodigo}/${safeId}`, JSON.stringify(data), { retain: true, qos: 0 });
+                    mqttClient.subscribe(`dnd/mesa/${mesaCodigo}/${safeId}/cmd`);
+                });
+            }, 100); // Delay de 100ms para agrupar mudanças rápidas
         }
 
         function handleRemoteCommand(safeId, cmd) {
@@ -4690,7 +4704,13 @@
                 return;
             }
 
-            mqttClient.publish(`dnd/mesa/${mesaCodigo}/${currentTargetPlayerId}/cmd`, JSON.stringify({
+            // Garantir que estamos enviando para o ID correto
+            if (!currentTargetPlayerId) {
+                alert("Erro: Nenhum personagem selecionado.");
+                return;
+            }
+
+            const payload = {
                 type: 'add_item',
                 item: {
                     name: name,
@@ -4698,10 +4718,19 @@
                     photo: photo,
                     color: color
                 }
-            }));
+            };
 
-            closeMasterItemModal();
-            alert("Item enviado com sucesso!");
+            // Enviar com QoS 1 para garantir a entrega do item
+            mqttClient.publish(`dnd/mesa/${mesaCodigo}/${currentTargetPlayerId}/cmd`, JSON.stringify(payload), { qos: 1 }, (err) => {
+                if (err) {
+                    console.error("Erro ao enviar item:", err);
+                    alert("Erro ao enviar item. Tente novamente.");
+                } else {
+                    console.log("Item enviado com sucesso para:", currentTargetPlayerId);
+                    closeMasterItemModal();
+                    alert("Item enviado com sucesso!");
+                }
+            });
         }
 
         function remoteHPAction(playerId, type) {
@@ -4731,12 +4760,12 @@
             syncPlayerData();
         };
 
-        // Auto-sincronização a cada 30 segundos se estiver conectado
+        // Heartbeat de sincronização a cada 5 segundos para manter status online
         setInterval(() => {
             if (mqttClient && mqttClient.connected) {
                 syncPlayerData();
             }
-        }, 30000);
+        }, 5000);
 
         // Função de Reset do Painel
         function resetMestrePanel() {
