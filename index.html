@@ -3666,6 +3666,7 @@
                 mqttClient = null;
                 selectedCharIndices.clear();
                 isSelectingForMesa = false;
+                resetMestrePanel(); // Limpa a lista de jogadores ao desconectar
                 updateOnlineButtonState();
                 renderCharacterGrid();
                 return;
@@ -3695,6 +3696,9 @@
                 renderCharacterGrid();
                 return;
             }
+
+            // Resetar o painel antes de conectar a uma nova mesa
+            resetMestrePanel();
 
             // Conectar ao MQTT
             const statusDot = document.getElementById('status-dot');
@@ -3901,12 +3905,20 @@
             }
         }
 
-        // Inicializa o arraste quando o documento carregar
+        // Inicializa o arraste e garante reset do painel ao carregar
         document.addEventListener('DOMContentLoaded', () => {
             const panel = document.getElementById('mestre-panel');
             const header = document.getElementById('mestre-panel-header');
             if (panel && header) makeDraggable(panel, header);
+            
+            // Resetar o painel ao carregar a página para evitar dados fantasmas
+            resetMestrePanel();
         });
+
+        // Limpar dados ao fechar ou recarregar a página
+        window.onbeforeunload = function() {
+            if (mqttClient) mqttClient.end();
+        };
     </script>
     <!-- UI DO PAINEL DO MESTRE -->
     <div id="mestre-panel" style="display:none; position:fixed; top:20px; right:20px; width:280px; background:var(--card-bg); border:2px solid var(--accent-color); border-radius:12px; padding:15px; z-index:9999; box-shadow: 0 10px 30px rgba(0,0,0,0.5); cursor: default;">
