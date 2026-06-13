@@ -999,31 +999,40 @@
             min-width: 80px;
         }
 
-        .inventory-item-delete {
-            position: absolute;
-            top: 5px;
-            right: 5px;
-            width: 20px;
-            height: 20px;
-            background: #ef4444;
-            color: white;
-            border: none;
-            border-radius: 50%;
-            cursor: pointer;
+        .inventory-item-actions {
             display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 12px;
+            gap: 4px;
             opacity: 0;
             transition: opacity 0.2s;
         }
 
-        .inventory-item:hover .inventory-item-delete {
+        .inventory-item:hover .inventory-item-actions {
             opacity: 1;
         }
 
-        .inventory-item-delete:hover {
-            background: #dc2626;
+        .inventory-item-btn {
+            width: 20px;
+            height: 20px;
+            background: transparent;
+            color: var(--accent-color);
+            border: 1px solid var(--accent-color);
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            padding: 0;
+        }
+
+        .inventory-item-btn:hover {
+            background: var(--accent-color);
+            color: var(--bg-color);
+        }
+
+        .inventory-item-btn.delete:hover {
+            background: #ef4444;
+            border-color: #ef4444;
         }
 
         .inventory-item.master-item {
@@ -1035,51 +1044,11 @@
             box-shadow: 0 0 8px currentColor;
         }
 
+        .inventory-item.master-item .inventory-item-name {
+            font-style: italic;
+        }
+
         /* Character death state */
-        .char-dead .mestre-card-photo {
-            filter: grayscale(100%);
-        }
-
-        .char-dead .mestre-card-main > div:first-child {
-            opacity: 0.6;
-        }
-
-        /* Multi-select for master panel */
-        .master-apply-toggle {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px;
-            background: rgba(88, 166, 255, 0.1);
-            border-radius: 6px;
-            margin-bottom: 10px;
-            cursor: pointer;
-        }
-
-        .master-apply-toggle input[type="checkbox"] {
-            cursor: pointer;
-        }
-
-        .selected-players-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-            margin-bottom: 10px;
-            padding: 8px;
-            background: rgba(88, 166, 255, 0.05);
-            border-radius: 6px;
-        }
-
-        .selected-player-tag {
-            background: var(--accent-color);
-            color: var(--bg-color);
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: 600;
-        }
-
-
         .char-dead {
             opacity: 0.6 !important;
         }
@@ -1087,6 +1056,91 @@
         .char-dead .mestre-card-photo {
             filter: grayscale(100%) !important;
         }
+
+        /* Create Modal with Point Buy Side by Side */
+        .create-modal-wrapper {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            max-width: 1400px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .create-form-section {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .pointbuy-section {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 15px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .pointbuy-section h3 {
+            color: var(--accent-color);
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .pointbuy-stats-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+
+        .pointbuy-stats-table th {
+            background: var(--accent-color);
+            color: var(--bg-color);
+            padding: 6px 4px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        .pointbuy-stats-table td {
+            padding: 6px 4px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .pointbuy-stats-table input {
+            width: 40px;
+            padding: 2px 4px;
+            font-size: 11px;
+        }
+
+        .pointbuy-info {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px;
+            background: rgba(88, 166, 255, 0.1);
+            border-radius: 4px;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+
+        .pointbuy-info .points-used {
+            font-weight: bold;
+            color: var(--accent-color);
+        }
+
+        .pointbuy-info .points-used.exceeded {
+            color: #ff4d4d;
+        }
+
+        @media (max-width: 1200px) {
+            .create-modal-wrapper {
+                grid-template-columns: 1fr;
+            }
+        }
+
         /* ===== RESPONSIVO ===== */
         @media (max-width: 1200px) {
             .ficha-content-grid { grid-template-columns: 1fr 1fr; }
@@ -1679,46 +1733,6 @@
         </div>
     </div>
 
-    <!-- MODAL CALCULADOR DE ATRIBUTOS (POINT BUY) -->
-    <div id="pointBuyModal" class="modal">
-        <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
-            <h2 class="modal-title">Calculador de Pontos de Atributos</h2>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                <div class="form-group">
-                    <label>Raça / Sub-raça</label>
-                    <select id="pbRaceSelect" style="width:100%; padding:8px 12px; background:var(--bg-color); border:1px solid var(--border-color); border-radius:6px; color:var(--text-color); font-family:inherit;">
-                        <option value="none">Nenhuma / Custom</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Limite de Pontos</label>
-                    <input type="number" id="pbLimitInput" value="27" min="1" max="999" style="width:100%; padding:8px 12px; background:var(--bg-color); border:1px solid var(--border-color); border-radius:6px; color:var(--text-color); font-family:inherit;">
-                </div>
-            </div>
-            <table style="width:100%; border-collapse:collapse; margin-bottom:15px;">
-                <thead>
-                    <tr style="background:var(--accent-color); color:var(--bg-color);">
-                        <th style="padding:10px; text-align:left;">Atributo</th>
-                        <th style="padding:10px; text-align:center;">Base</th>
-                        <th style="padding:10px; text-align:center;">Racial</th>
-                        <th style="padding:10px; text-align:center;">Total</th>
-                        <th style="padding:10px; text-align:center;">Mod.</th>
-                        <th style="padding:10px; text-align:center;">Custo</th>
-                    </tr>
-                </thead>
-                <tbody id="pbStatsTable"></tbody>
-            </table>
-            <div style="display:flex; justify-content:space-between; align-items:center; padding:10px; background:rgba(0,0,0,0.3); border-radius:6px; margin-bottom:15px;">
-                <div style="font-size:1.1em; font-weight:bold;">Pontos: <span id="pbUsedPoints">0</span> / <span id="pbMaxPoints">27</span></div>
-                <button onclick="resetPointBuy()" style="padding:8px 15px; background:var(--accent-color); color:var(--bg-color); border:none; border-radius:6px; cursor:pointer; font-weight:600;">Resetar</button>
-            </div>
-            <div class="modal-footer">
-                <button onclick="closePointBuyModal()">Cancelar</button>
-                <button style="background:var(--accent-color); color:var(--bg-color); border-color:var(--accent-color);" onclick="applyPointBuyToCharacter()">Aplicar Atributos</button>
-            </div>
-        </div>
-    </div>
-
     <!-- ===== MODAL CRIAR PERSONAGEM ===== -->
     <div id="createModal" class="modal">
         <div class="modal-content">
@@ -1727,18 +1741,35 @@
                 <label>Nome do Personagem</label>
                 <input type="text" id="newCharName" placeholder="Ex: Aragorn">
             </div>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-                <div class="form-group">
-                    <label>Classe</label>
-                    <input type="text" id="newCharClass" placeholder="Ex: Guerreiro">
+            <div id="createModalWrapper" class="create-modal-wrapper">
+                <div class="create-form-section">
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                        <div class="form-group">
+                            <label>Classe</label>
+                            <input type="text" id="newCharClass" placeholder="Ex: Guerreiro">
+                        </div>
+                        <div class="form-group">
+                            <label>Nível</label>
+                            <input type="number" id="newCharLevel" value="1" min="1" max="20">
+                        </div>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label>Nível</label>
-                    <input type="number" id="newCharLevel" value="1" min="1" max="20">
+                <div class="pointbuy-section" id="pointBuyPanel">
+                    <h3>📊 Calculador de Atributos (Point Buy)</h3>
+                    <div class="form-group">
+                        <label style="font-size:11px;">Raça</label>
+                        <select id="pbRaceSelect" style="width:100%; padding:6px; font-size:11px; background:var(--bg-color); border:1px solid var(--border-color); border-radius:4px; color:var(--text-color);"></select>
+                    </div>
+                    <div class="form-group">
+                        <label style="font-size:11px;">Limite de Pontos</label>
+                        <input type="number" id="pbLimitInput" value="27" min="1" style="font-size:11px;">
+                    </div>
+                    <table class="pointbuy-stats-table" id="pbStatsTable"></table>
+                    <div class="pointbuy-info">
+                        <span>Pontos: <span class="points-used" id="pbUsedPoints">0</span> / <span id="pbMaxPoints">27</span></span>
+                        <button onclick="resetPointBuy()" style="padding:4px 8px; font-size:10px;">Resetar</button>
+                    </div>
                 </div>
-            </div>
-            <div class="form-group">
-                <button onclick="openPointBuyModal()" style="width:100%; background:rgba(88,166,255,0.2); border-color:var(--accent-color); color:var(--accent-color); font-weight:600; padding:12px;">📊 Calculador de Atributos (Point Buy)</button>
             </div>
             <div class="form-group">
                 <label>Foto (Opcional)</label>
@@ -4114,37 +4145,30 @@
                 if (!iamTheMestre && p.hidden) return;
 
                 const card = document.createElement('div');
-                card.className = 'mestre-card ' + isDeadClass;
-                if (p.hp <= 0) card.style.cssText = deadStyle;
+                card.className = 'mestre-card';
                 if (p.hidden) card.style.opacity = '0.6';
                 if (iamTheMestre) card.style.cursor = 'pointer';
                 
                 const isExpanded = expandedPlayers.has(p.id);
 
                 const hpPercent = (p.hp / p.hpMax) * 100;
-                // Prioritize condition color over HP color
-                let hpColor = '#4dff88';  // Default green
-                if (p.condition && p.conditionColor && p.condition !== 'Nenhuma') {
-                    hpColor = p.conditionColor;  // Condition color takes priority
-                } else {
-                    // Only apply HP-based colors if no condition
-                    hpColor = hpPercent > 50 ? '#4dff88' : (hpPercent > 20 ? '#ffd700' : '#ff4d4d');
+                let hpColor = hpPercent > 50 ? '#4dff88' : (hpPercent > 20 ? '#ffd700' : '#ff4d4d');
+                
+                // Sobrescrever cor se houver condição
+                if (p.condition && p.conditionColor) {
+                    hpColor = p.conditionColor;
                 }
 
                 const tempHPText = p.tempHP > 0 ? `<span style="color:#58a6ff"> (+${p.tempHP})</span>` : '';
-                const isDeadClass = p.hp <= 0 ? 'char-dead' : '';
-                const deadStyle = p.hp <= 0 ? 'opacity: 0.6;' : '';
-                const skullName = p.hp <= 0 ? '☠️ ' : '';
                 card.innerHTML = `
                     <div class="mestre-card-main" onclick="${iamTheMestre ? `toggleExpandPlayer('${p.id}')` : ''}">
-                        ${masterApplyMode ? `<div style="display:flex; align-items:center; margin-right:8px;"><input type="checkbox" style="cursor:pointer; width:18px; height:18px;" onchange="togglePlayerSelection('${p.id}')" ${masterSelectedPlayers.has(p.id) ? 'checked' : ''}></div>` : ''}
                         <div class="mestre-card-photo-container">
-                            <img src="${p.photo || ''}" class="mestre-card-photo" style="border-color:${hpColor}; ${p.hp <= 0 ? 'filter: grayscale(100%);' : ''}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%23334155%22/><text x=%2250%%22 y=%2250%%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22white%22 font-size=%2240%22>?</text></svg>'">
+                            <img src="${p.photo || ''}" class="mestre-card-photo" style="border-color:${hpColor}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%23334155%22/><text x=%2250%%22 y=%2250%%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22white%22 font-size=%2240%22>?</text></svg>'">
                             ${iamTheMestre ? `<div class="visibility-toggle" onclick="event.stopPropagation(); togglePlayerVisibility('${p.id}')">${p.hidden ? '👁️‍🗨️' : '👁️'}</div>` : ''}
                         </div>
                         <div style="flex:1">
                             <div style="font-weight:bold; color:${hpColor}; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                                ${skullName}${p.name} <small style="color:#64748b; font-weight:normal;">Nív ${p.level || 1} ${p.class || ''}</small>
+                                ${p.name} <small style="color:#64748b; font-weight:normal;">Nív ${p.level || 1} ${p.class || ''}</small>
                             </div>
                             <div style="display:flex; justify-content:space-between; margin-top:3px; font-size:11px;">
                                 <span>HP: ${p.hp}/${p.hpMax}${tempHPText}</span>
@@ -4164,7 +4188,6 @@
                         <div style="display:flex; gap:5px; align-items:center;">
                             <button onclick="promptCustomCondition('${p.id}')" style="font-size:9px; padding:2px 5px; flex:1;">➕ Condição</button>
                             <button onclick="setPlayerCondition('${p.id}', 'Nenhuma', '')" style="font-size:9px; padding:2px 5px; background:#475569; border-color:#475569;">Limpar</button>
-                            <button onclick="openMasterItemModal('${p.id}')" style="font-size:9px; padding:2px 5px; background:#9333ea; border-color:#9333ea;">📦 Item</button>
                         </div>
                         <div class="mestre-hp-controls">
                             <input type="text" id="hp-val-${p.id}" placeholder="1d6+5" onclick="event.stopPropagation()">
@@ -4431,15 +4454,28 @@
             }
             if (mqttClient) mqttClient.end();
         });
-        // ===== INVENTORY SYSTEM (NEW) =====
-        let currentEditingInventoryItem = null;
 
-        async function openInventoryItemModal() {
-            currentEditingInventoryItem = null;
-            document.getElementById('inventoryItemName').value = '';
-            document.getElementById('inventoryItemDesc').value = '';
+        // ===== INVENTORY SYSTEM =====
+        let currentEditingInventoryItem = null;
+        let currentEditingInventoryIndex = -1;
+
+        async function openInventoryItemModal(itemIndex = -1) {
+            currentEditingInventoryIndex = itemIndex;
+            const char = allCharacters[currentCharacterIndex];
+            
+            if (itemIndex >= 0 && char.inventory && char.inventory[itemIndex]) {
+                const item = char.inventory[itemIndex];
+                document.getElementById('inventoryItemName').value = item.name;
+                document.getElementById('inventoryItemDesc').value = item.desc;
+                document.getElementById('inventoryItemValue').value = item.value;
+                document.querySelector('h2.modal-title').innerText = 'Editar Item';
+            } else {
+                document.getElementById('inventoryItemName').value = '';
+                document.getElementById('inventoryItemDesc').value = '';
+                document.getElementById('inventoryItemValue').value = '';
+                document.querySelector('h2.modal-title').innerText = 'Adicionar Item';
+            }
             document.getElementById('inventoryItemPhoto').value = '';
-            document.getElementById('inventoryItemValue').value = '';
             document.getElementById('inventoryItemModal').style.display = 'flex';
         }
 
@@ -4467,15 +4503,21 @@
                 });
             }
 
-            const item = {
-                id: Date.now(),
-                name, desc, value, photo: photoData,
-                masterColor: null
-            };
-
-            if (currentEditingInventoryItem !== null) {
-                char.inventory[currentEditingInventoryItem] = item;
+            if (currentEditingInventoryIndex >= 0) {
+                // Editar item existente
+                const item = char.inventory[currentEditingInventoryIndex];
+                item.name = name;
+                item.desc = desc;
+                item.value = value;
+                if (photoData) item.photo = photoData;
             } else {
+                // Novo item
+                const item = {
+                    id: Date.now(),
+                    name, desc, value,
+                    photo: photoData,
+                    masterColor: null
+                };
                 char.inventory.push(item);
             }
 
@@ -4502,6 +4544,9 @@
 
                 const photoHtml = item.photo ? `<img src="${item.photo}" class="inventory-item-photo" style="${item.masterColor ? 'border-color:' + item.masterColor : ''}">` : '<div class="inventory-item-photo" style="display:flex; align-items:center; justify-content:center; background:var(--card-bg); color:#64748b;">📦</div>';
 
+                const isEditable = !item.masterColor;
+                const editBtn = isEditable ? `<button class="inventory-item-btn" onclick="openInventoryItemModal(${idx})" title="Editar">✎</button>` : '';
+
                 div.innerHTML = `
                     ${photoHtml}
                     <div class="inventory-item-content">
@@ -4509,7 +4554,10 @@
                         <div class="inventory-item-desc">${item.desc || 'Sem descrição'}</div>
                     </div>
                     <div class="inventory-item-value">${item.value || '—'}</div>
-                    <button class="inventory-item-delete" onclick="deleteInventoryItem(${idx})">×</button>
+                    <div class="inventory-item-actions">
+                        ${editBtn}
+                        <button class="inventory-item-btn delete" onclick="deleteInventoryItem(${idx})" title="Deletar">×</button>
+                    </div>
                 `;
 
                 // Drag and drop
@@ -4556,7 +4604,7 @@
             "Aasimar (Fallen)": {"cha": 2, "str": 1},
             "Bugbear": {"str": 2, "dex": 1},
             "Centaur": {"str": 2, "wis": 1},
-            "Changeling": {"cha": 2, "choice": 1},
+            "Changeling": {"cha": 2},
             "Dragonborn": {"str": 2, "cha": 1},
             "Dwarf (Hill)": {"con": 2, "wis": 1},
             "Dwarf (Mountain)": {"con": 2, "str": 2},
@@ -4575,35 +4623,33 @@
             "Goblin": {"dex": 2, "con": 1},
             "Goliath": {"str": 2, "con": 1},
             "Grung": {"dex": 2, "con": 1},
-            "Half-Elf": {"cha": 2, "choice": 2},
+            "Half-Elf": {"cha": 2},
             "Half-Orc": {"str": 2, "con": 1},
             "Halfling (Lightfoot)": {"dex": 2, "cha": 1},
             "Halfling (Stout)": {"dex": 2, "con": 1},
             "Hobgoblin": {"con": 2, "int": 1},
             "Human": {"str": 1, "dex": 1, "con": 1, "int": 1, "wis": 1, "cha": 1},
-            "Human (Variant)": {"choice": 2},
             "Kalashtar": {"wis": 2, "cha": 1},
             "Kenku": {"dex": 2, "wis": 1},
-            "Kobold": {"dex": 2, "str": -2},
+            "Kobold": {"dex": 2},
             "Leonin": {"con": 2, "str": 1},
             "Lizardfolk": {"con": 2, "wis": 1},
             "Locathah": {"str": 2, "dex": 1},
             "Loxodon": {"con": 2, "wis": 1},
             "Minotaur": {"str": 2, "con": 1},
-            "Orc": {"str": 2, "con": 1, "int": -2},
+            "Orc": {"str": 2, "con": 1},
             "Satyr": {"cha": 2, "dex": 1},
             "Shifter (Beasthide)": {"con": 2, "str": 1},
             "Shifter (Longtooth)": {"str": 2, "dex": 1},
             "Shifter (Swiftstride)": {"dex": 2, "cha": 1},
             "Shifter (Wildhunt)": {"wis": 2, "dex": 1},
-            "Simic Hybrid": {"con": 2, "choice": 1},
+            "Simic Hybrid": {"con": 2},
             "Tabaxi": {"dex": 2, "cha": 1},
             "Tiefling": {"cha": 2, "int": 1},
-            "Tiefling (Feral)": {"dex": 2, "int": 1},
             "Tortle": {"str": 2, "wis": 1},
             "Triton": {"str": 1, "con": 1, "cha": 1},
             "Vedalken": {"int": 2, "wis": 1},
-            "Warforged": {"con": 2, "choice": 1},
+            "Warforged": {"con": 2},
             "Yuan-Ti Pureblood": {"cha": 2, "int": 1}
         };
 
@@ -4638,16 +4684,19 @@
                 raceSelect.appendChild(opt);
             });
 
-            document.getElementById('pbLimitInput').addEventListener('input', (e) => {
-                pbState.limit = parseInt(e.target.value) || 0;
-                document.getElementById('pbMaxPoints').innerText = pbState.limit;
-                renderPointBuyTable();
-            });
-
             raceSelect.addEventListener('change', (e) => {
                 pbState.race = e.target.value;
                 renderPointBuyTable();
             });
+
+            const limitInput = document.getElementById('pbLimitInput');
+            if (limitInput) {
+                limitInput.addEventListener('input', (e) => {
+                    pbState.limit = parseInt(e.target.value) || 0;
+                    document.getElementById('pbMaxPoints').innerText = pbState.limit;
+                    renderPointBuyTable();
+                });
+            }
 
             renderPointBuyTable();
         }
@@ -4674,12 +4723,12 @@
 
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td style="padding:10px; text-align:left; font-weight:bold; color:var(--accent-color);">${attr.name}</td>
-                    <td style="padding:10px; text-align:center;"><input type="number" value="${base}" min="8" max="15" onchange="pbUpdateScore('${attr.id}', this.value)" style="width:50px; text-align:center; background:var(--bg-color); border:1px solid var(--border-color); color:var(--text-color); padding:5px; border-radius:4px;"></td>
-                    <td style="padding:10px; text-align:center;">${racial > 0 ? '+' + racial : racial < 0 ? racial : '0'}</td>
-                    <td style="padding:10px; text-align:center; font-weight:bold; color:var(--accent-color);">${total}</td>
-                    <td style="padding:10px; text-align:center; color:#4dff88; font-weight:bold;">${mod >= 0 ? '+' + mod : mod}</td>
-                    <td style="padding:10px; text-align:center;">${cost}</td>
+                    <td style="font-weight:bold; color:var(--accent-color);">${attr.name}</td>
+                    <td style="text-align:center;"><input type="number" value="${base}" min="8" max="15" onchange="pbUpdateScore('${attr.id}', this.value)" style="width:35px;"></td>
+                    <td style="text-align:center;">${racial > 0 ? '+' + racial : racial < 0 ? racial : '0'}</td>
+                    <td style="text-align:center; font-weight:bold; color:var(--accent-color);">${total}</td>
+                    <td style="text-align:center; color:#4dff88;">${mod >= 0 ? '+' + mod : mod}</td>
+                    <td style="text-align:center;">${cost}</td>
                 `;
                 tbody.appendChild(row);
             });
@@ -4687,9 +4736,9 @@
             const usedSpan = document.getElementById('pbUsedPoints');
             usedSpan.innerText = totalUsed;
             if (totalUsed > pbState.limit) {
-                usedSpan.style.color = '#ff4d4d';
+                usedSpan.classList.add('exceeded');
             } else {
-                usedSpan.style.color = 'var(--accent-color)';
+                usedSpan.classList.remove('exceeded');
             }
         }
 
@@ -4701,16 +4750,6 @@
             renderPointBuyTable();
         };
 
-        function openPointBuyModal() {
-            pbState = { scores: { str: 8, dex: 8, con: 8, int: 8, wis: 8, cha: 8 }, race: 'none', limit: 27 };
-            document.getElementById('pointBuyModal').style.display = 'flex';
-            setTimeout(() => initPointBuy(), 100);
-        }
-
-        function closePointBuyModal() {
-            document.getElementById('pointBuyModal').style.display = 'none';
-        }
-
         function resetPointBuy() {
             pbState = { scores: { str: 8, dex: 8, con: 8, int: 8, wis: 8, cha: 8 }, race: 'none', limit: 27 };
             document.getElementById('pbRaceSelect').value = 'none';
@@ -4719,26 +4758,9 @@
             renderPointBuyTable();
         }
 
-        function applyPointBuyToCharacter() {
-            // Apply the calculated scores to the character attributes
-            const char = allCharacters[currentCharacterIndex];
-            if (!char) {
-                // If no character is being edited, we'll apply when creating
-                window.pbScoresToApply = JSON.parse(JSON.stringify(pbState.scores));
-            } else {
-                Object.entries(pbState.scores).forEach(([key, val]) => {
-                    const attrMap = { str: 'strength', dex: 'dexterity', con: 'constitution', int: 'intelligence', wis: 'wisdom', cha: 'charisma' };
-                    char.attributes[attrMap[key]].value = val;
-                });
-                saveAll();
-                renderAttributes();
-            }
-            closePointBuyModal();
-        }
-
         // ===== MASTER PANEL MULTI-SELECT =====
-        let masterSelectedPlayers = new Set();
         let masterApplyMode = false;
+        let masterSelectedPlayers = new Set();
 
         function toggleMasterApplyMode(playerId) {
             masterApplyMode = !masterApplyMode;
@@ -4759,92 +4781,20 @@
             renderMestrePanel();
         }
 
-        // ===== DEATH STATE HANDLING =====
-        function updateCharacterDeathState() {
-            const char = allCharacters[currentCharacterIndex];
-            if (char.hitPoints <= 0) {
-                // Character is dead
-                const hpBar = document.getElementById('hpBar');
-                if (hpBar) hpBar.style.backgroundColor = '#334155';
-            }
-        }
-
-        // Modify updateHPDisplay to check for death
-        const originalUpdateHPDisplay = updateHPDisplay;
-        updateHPDisplay = function() {
-            originalUpdateHPDisplay.call(this);
-            updateCharacterDeathState();
-            syncPlayerData();
-        };
-
-        // Modify renderMestrePanel to show death state
-        const originalRenderMestrePanel = renderMestrePanel;
-        renderMestrePanel = function() {
-            originalRenderMestrePanel.call(this);
-            
-            // Update death states in master panel
-            const list = document.getElementById('mestre-list');
-            if (!list) return;
-            
-            Object.values(jogadoresOnline).forEach(p => {
-                if (p.hp <= 0) {
-                    const card = list.querySelector(`[data-player-id="${p.id}"]`);
-                    if (card) {
-                        card.classList.add('char-dead');
-                        const nameEl = card.querySelector('[data-name]');
-                        if (nameEl && !nameEl.innerText.includes('☠️')) {
-                            nameEl.innerText = '☠️ ' + p.name;
-                        }
-                    }
-                }
-            });
-        };
-
         // ===== MASTER ITEM SENDING =====
-        let masterItemModal = null;
+        let masterItemTargetId = null;
         let masterItemColor = null;
 
         function openMasterItemModal(playerId) {
-            masterItemModal = playerId;
+            masterItemTargetId = playerId;
             masterItemColor = null;
-            // Show a modal to add item with color
-            const modal = document.createElement('div');
-            modal.className = 'modal';
-            modal.id = 'masterItemModal';
-            modal.style.display = 'flex';
-            modal.innerHTML = `
-                <div class="modal-content">
-                    <h2 class="modal-title">Enviar Item Lendário</h2>
-                    <div class="form-group">
-                        <label>Nome do Item</label>
-                        <input type="text" id="masterItemName" placeholder="Ex: Espada Flamejante">
-                    </div>
-                    <div class="form-group">
-                        <label>Descrição</label>
-                        <textarea id="masterItemDesc" placeholder="Descrição..." style="height:80px;"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label>Foto (Opcional)</label>
-                        <input type="file" id="masterItemPhoto" accept="image/*">
-                    </div>
-                    <div class="form-group">
-                        <label>Valor (Ex: Dano 2d6+3)</label>
-                        <input type="text" id="masterItemValue" placeholder="Ex: Dano 2d6+3">
-                    </div>
-                    <div class="form-group">
-                        <label>Cor do Item (Lendário)</label>
-                        <div id="masterColorPalette" style="display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-top:8px;"></div>
-                    </div>
-                    <div class="modal-footer">
-                        <button onclick="closeMasterItemModal()">Cancelar</button>
-                        <button style="background:var(--accent-color); color:var(--bg-color); border-color:var(--accent-color);" onclick="sendMasterItem()">Enviar Item</button>
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(modal);
+            document.getElementById('masterItemName').value = '';
+            document.getElementById('masterItemDesc').value = '';
+            document.getElementById('masterItemPhoto').value = '';
+            document.getElementById('masterItemValue').value = '';
             
-            // Add color palette
             const palette = document.getElementById('masterColorPalette');
+            palette.innerHTML = '';
             const colors = ['#ff4d4d', '#ffd700', '#4dff88', '#58a6ff', '#bc8cf2', '#ff69b4', '#00ced1', '#ffa500'];
             colors.forEach(color => {
                 const btn = document.createElement('div');
@@ -4856,11 +4806,12 @@
                 };
                 palette.appendChild(btn);
             });
+            
+            document.getElementById('masterItemModal').style.display = 'flex';
         }
 
         function closeMasterItemModal() {
-            const modal = document.getElementById('masterItemModal');
-            if (modal) modal.remove();
+            document.getElementById('masterItemModal').style.display = 'none';
         }
 
         async function sendMasterItem() {
@@ -4880,10 +4831,9 @@
                 });
             }
 
-            // Find the character and add item
             const targetChar = allCharacters.find(c => {
                 const id = btoa(unescape(encodeURIComponent(c.name))).replace(/[/+=]/g, '');
-                return id === masterItemModal;
+                return id === masterItemTargetId;
             });
 
             if (targetChar) {
@@ -4895,13 +4845,12 @@
                 });
                 saveAll();
                 
-                // Sync via MQTT if connected
                 if (mqttClient && mqttClient.connected) {
                     const data = {
                         type: 'add_item',
                         item: { name, desc, value, photo: photoData, masterColor: masterItemColor }
                     };
-                    mqttClient.publish(`dnd/mesa/${mesaCodigo}/${masterItemModal}/cmd`, JSON.stringify(data));
+                    mqttClient.publish(`dnd/mesa/${mesaCodigo}/${masterItemTargetId}/cmd`, JSON.stringify(data));
                 }
             }
 
@@ -4909,7 +4858,7 @@
             alert('Item enviado com sucesso!');
         }
 
-        // Initialize inventory on character load
+        // ===== MODIFY EXISTING FUNCTIONS =====
         const originalLoadCharacterData = loadCharacterData;
         loadCharacterData = function(char) {
             originalLoadCharacterData.call(this, char);
@@ -4917,15 +4866,82 @@
             renderInventory();
         };
 
-        // Initialize on page load
-        const originalWindowOnload = window.onload;
-        window.onload = function() {
-            originalWindowOnload.call(this);
-            // Initialize Point Buy modal races
-            setTimeout(() => {
-                const raceSelect = document.getElementById('pbRaceSelect');
-                if (raceSelect) initPointBuy();
-            }, 500);
+        const originalCreateNewCharacter = createNewCharacter;
+        createNewCharacter = async function() {
+            const name = document.getElementById('newCharName').value.trim() || 'Novo Personagem';
+            const charClass = document.getElementById('newCharClass').value.trim();
+            const level = parseInt(document.getElementById('newCharLevel').value) || 1;
+            const photoFile = document.getElementById('newCharPhoto').files[0];
+            let photoData = '';
+            if (photoFile) {
+                photoData = await new Promise(resolve => {
+                    const reader = new FileReader();
+                    reader.onload = e => resolve(e.target.result);
+                    reader.readAsDataURL(photoFile);
+                });
+            }
+
+            const newChar = {
+                name, class: charClass, level, photo: photoData,
+                playerName: '', race: '', background: '', alignment: '',
+                attributes: JSON.parse(JSON.stringify(ATTRIBUTE_DEFAULTS)),
+                skills: JSON.parse(JSON.stringify(SKILL_DEFAULTS)),
+                hitPoints: 10, maxHitPoints: 10, tempHP: 0,
+                deathSaves: { success: [false, false, false], failure: [false, false, false] },
+                armorClass: 10, speed: 30, proficiencyBonus: 2, inspiration: 0,
+                traits: '', ideals: '', bonds: '', flaws: '', features: '', equipment: '', notes: '',
+                photoWidth: 150, photoHeight: 150,
+                grimorio: { title: "📖 Grimório de " + name, sections: [] },
+                inventory: []
+            };
+
+            // Apply Point Buy if defined
+            if (pbState && pbState.scores) {
+                const attrMap = { str: 'strength', dex: 'dexterity', con: 'constitution', int: 'intelligence', wis: 'wisdom', cha: 'charisma' };
+                Object.entries(pbState.scores).forEach(([key, val]) => {
+                    newChar.attributes[attrMap[key]].value = val;
+                });
+            }
+
+            allCharacters.push(newChar);
+            saveAll();
+            renderCharacterGrid();
+            closeCreateModal();
+        };
+
+        // Initialize Point Buy on modal open
+        const originalOpenCreateModal = openCreateModal;
+        openCreateModal = function() {
+            originalOpenCreateModal.call(this);
+            pbState = { scores: { str: 8, dex: 8, con: 8, int: 8, wis: 8, cha: 8 }, race: 'none', limit: 27 };
+            setTimeout(() => initPointBuy(), 100);
+        };
+
+        // Update renderMestrePanel to show death state and multi-select
+        const originalRenderMestrePanel = renderMestrePanel;
+        renderMestrePanel = function() {
+            originalRenderMestrePanel.call(this);
+            
+            // Apply death styling
+            const list = document.getElementById('mestre-list');
+            if (list) {
+                Object.values(jogadoresOnline).forEach(p => {
+                    if (p.hp <= 0) {
+                        const cards = list.querySelectorAll('.mestre-card');
+                        cards.forEach(card => {
+                            const nameEl = card.querySelector('[style*="font-weight:bold"]');
+                            if (nameEl && nameEl.innerText.includes(p.name)) {
+                                card.classList.add('char-dead');
+                                const photo = card.querySelector('.mestre-card-photo');
+                                if (photo) photo.style.filter = 'grayscale(100%)';
+                                if (!nameEl.innerText.includes('☠️')) {
+                                    nameEl.innerHTML = nameEl.innerHTML.replace(p.name, '☠️ ' + p.name);
+                                }
+                            }
+                        });
+                    }
+                });
+            }
         };
 
     </script>
@@ -4948,33 +4964,6 @@
         </div>
     </div>
     
-    <!-- MODAL ADICIONAR ITEM AO INVENTÁRIO -->
-    <div id="inventoryItemModal" class="modal">
-        <div class="modal-content">
-            <h2 class="modal-title">Adicionar Item ao Inventário</h2>
-            <div class="form-group">
-                <label>Nome do Item</label>
-                <input type="text" id="inventoryItemName" placeholder="Ex: Espada Longa">
-            </div>
-            <div class="form-group">
-                <label>Descrição</label>
-                <textarea id="inventoryItemDesc" placeholder="Descrição do item..." style="height:80px;"></textarea>
-            </div>
-            <div class="form-group">
-                <label>Foto (Opcional)</label>
-                <input type="file" id="inventoryItemPhoto" accept="image/*">
-            </div>
-            <div class="form-group">
-                <label>Valor Importante (Ex: Dano 1d6+2)</label>
-                <input type="text" id="inventoryItemValue" placeholder="Ex: Dano 1d6+2">
-            </div>
-            <div class="modal-footer">
-                <button onclick="closeInventoryItemModal()">Cancelar</button>
-                <button style="background:var(--accent-color); color:var(--bg-color); border-color:var(--accent-color);" onclick="saveInventoryItem()">Adicionar Item</button>
-            </div>
-        </div>
-    </div>
-
     <!-- MODAL DE CONDIÇÃO PERSONALIZADA -->
     <div id="condition-modal" class="condition-modal">
         <h3 style="margin:0; color:var(--accent-color); font-size:16px;">Nova Condição</h3>
@@ -5162,5 +5151,64 @@
         #mestre-list::-webkit-scrollbar { width: 4px; }
         #mestre-list::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 10px; }
     </style>
-</body>
+
+    <!-- MODAL ADICIONAR/EDITAR ITEM AO INVENTÁRIO -->
+    <div id="inventoryItemModal" class="modal">
+        <div class="modal-content">
+            <h2 class="modal-title">Adicionar/Editar Item</h2>
+            <div class="form-group">
+                <label>Nome do Item</label>
+                <input type="text" id="inventoryItemName" placeholder="Ex: Espada Longa">
+            </div>
+            <div class="form-group">
+                <label>Descrição</label>
+                <textarea id="inventoryItemDesc" placeholder="Descrição do item..." style="height:80px;"></textarea>
+            </div>
+            <div class="form-group">
+                <label>Foto (Opcional)</label>
+                <input type="file" id="inventoryItemPhoto" accept="image/*">
+            </div>
+            <div class="form-group">
+                <label>Valor Importante (Ex: Dano 1d6+2)</label>
+                <input type="text" id="inventoryItemValue" placeholder="Ex: Dano 1d6+2">
+            </div>
+            <div class="modal-footer">
+                <button onclick="closeInventoryItemModal()">Cancelar</button>
+                <button style="background:var(--accent-color); color:var(--bg-color); border-color:var(--accent-color);" onclick="saveInventoryItem()">Salvar Item</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL MASTER ENVIAR ITEM -->
+    <div id="masterItemModal" class="modal">
+        <div class="modal-content">
+            <h2 class="modal-title">Enviar Item Lendário</h2>
+            <div class="form-group">
+                <label>Nome do Item</label>
+                <input type="text" id="masterItemName" placeholder="Ex: Espada Flamejante">
+            </div>
+            <div class="form-group">
+                <label>Descrição</label>
+                <textarea id="masterItemDesc" placeholder="Descrição..." style="height:80px;"></textarea>
+            </div>
+            <div class="form-group">
+                <label>Foto (Opcional)</label>
+                <input type="file" id="masterItemPhoto" accept="image/*">
+            </div>
+            <div class="form-group">
+                <label>Valor (Ex: Dano 2d6+3)</label>
+                <input type="text" id="masterItemValue" placeholder="Ex: Dano 2d6+3">
+            </div>
+            <div class="form-group">
+                <label>Cor do Item (Lendário)</label>
+                <div id="masterColorPalette" style="display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-top:8px;"></div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="closeMasterItemModal()">Cancelar</button>
+                <button style="background:var(--accent-color); color:var(--bg-color); border-color:var(--accent-color);" onclick="sendMasterItem()">Enviar Item</button>
+            </div>
+        </div>
+    </div>
+
+    </body>
 </html>
