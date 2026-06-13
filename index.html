@@ -28,78 +28,7 @@
             gap: 12px;
             position: relative;
             transition: all 0.2s;
-            cursor: grab;
         }
-        .equipment-item:active { cursor: grabbing; }
-        .equipment-item.dragging { opacity: 0.5; border: 2px dashed var(--accent-color); }
-
-        /* Estilos da Paleta Photoshop */
-        .ps-picker-container {
-            background: #2c2c2c;
-            border: 1px solid #1a1a1a;
-            padding: 15px;
-            border-radius: 4px;
-            display: flex;
-            gap: 15px;
-            user-select: none;
-            color: #ccc;
-            font-family: sans-serif;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        }
-        .ps-color-area {
-            width: 200px;
-            height: 200px;
-            position: relative;
-            cursor: crosshair;
-            background: linear-gradient(to bottom, transparent, #000), linear-gradient(to right, #fff, transparent);
-        }
-        .ps-color-area-cursor {
-            width: 8px;
-            height: 8px;
-            border: 1px solid #fff;
-            border-radius: 50%;
-            position: absolute;
-            transform: translate(-50%, -50%);
-            pointer-events: none;
-            box-shadow: 0 0 2px #000;
-        }
-        .ps-hue-slider {
-            width: 20px;
-            height: 200px;
-            position: relative;
-            cursor: pointer;
-            background: linear-gradient(to bottom, #f00 0%, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00 100%);
-        }
-        .ps-hue-cursor {
-            width: 100%;
-            height: 4px;
-            border: 1px solid #fff;
-            position: absolute;
-            left: 0;
-            transform: translateY(-50%);
-            pointer-events: none;
-            box-shadow: 0 0 2px #000;
-        }
-        .ps-preview-box {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        .ps-current-color {
-            width: 60px;
-            height: 60px;
-            border: 1px solid #1a1a1a;
-        }
-        .ps-hex-input {
-            background: #1a1a1a;
-            border: 1px solid #444;
-            color: #fff;
-            padding: 4px;
-            width: 70px;
-            font-size: 12px;
-            text-align: center;
-        }
-        .ps-label { font-size: 10px; margin-bottom: 2px; color: #888; }
 
         .equipment-item:hover {
             border-color: var(--accent-color);
@@ -152,33 +81,25 @@
             display: flex;
             gap: 5px;
             align-items: center;
-            opacity: 0;
-            transition: opacity 0.2s;
-        }
-
-        .equipment-item:hover .item-actions {
-            opacity: 1;
         }
 
         .item-btn {
-            background: #334155;
-            border: 1px solid var(--border-color);
-            color: #e2e8f0;
+            background: transparent;
+            border: none;
+            color: #64748b;
             cursor: pointer;
-            padding: 4px 8px;
+            padding: 4px;
             border-radius: 4px;
-            font-size: 11px;
-            font-weight: bold;
+            font-size: 12px;
         }
 
         .item-btn:hover {
-            background: var(--accent-color);
-            color: var(--bg-color);
+            color: var(--accent-color);
+            background: rgba(255,255,255,0.1);
         }
 
         .item-btn.delete:hover {
-            background: #ef4444;
-            color: white;
+            color: #ef4444;
         }
 
         .item-master-badge {
@@ -1547,10 +1468,10 @@
                 <div class="merged-section">
                     <div class="ficha-section-dark resizable">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                            <h2 class="ficha-section-title-dark" style="margin:0;">🎒 Inventário</h2>
+                            <h2 class="ficha-section-title-dark" style="margin:0;">🎒 Equipamento</h2>
                             <button onclick="openItemModal()" style="font-size:11px; padding:2px 8px;">+ Item</button>
                         </div>
-                        <div id="equipment-list" class="equipment-list-container" ondragover="event.preventDefault()" ondrop="handleItemDrop(event)">
+                        <div id="equipment-list" class="equipment-list-container">
                             <!-- Itens dinâmicos aqui -->
                         </div>
                     </div>
@@ -3138,17 +3059,13 @@
                 
                 if (item.isMasterItem && item.color) {
                     const baseColor = item.color;
-                    // Cores mais vibrantes e opacas para itens do mestre
-                    style = `background: ${baseColor}22; border: 1px solid ${baseColor}; box-shadow: inset 0 0 10px ${baseColor}33;`;
-                    nameStyle = `color: ${baseColor}; font-weight: 800; text-shadow: 0 0 5px ${baseColor}44;`;
-                    descStyle = `color: ${baseColor}ee;`;
-                    photoStyle = `border: 2px solid ${baseColor}; box-shadow: 0 0 8px ${baseColor};`;
+                    style = `background: ${baseColor}22; border-color: ${baseColor}44;`;
+                    nameStyle = `color: ${baseColor};`;
+                    descStyle = `color: ${baseColor}bb;`;
+                    photoStyle = `border-color: ${baseColor};`;
                 }
 
                 card.setAttribute('style', style);
-                card.draggable = true;
-                card.ondragstart = (e) => handleItemDragStart(e, item.id);
-                card.ondragend = handleItemDragEnd;
 
                 card.innerHTML = `
                     <div class="item-photo-box" style="${photoStyle}">
@@ -3159,8 +3076,8 @@
                         <div class="item-desc" style="${descStyle}">${item.description || 'Sem descrição'}</div>
                     </div>
                     <div class="item-actions">
-                        ${!item.isMasterItem ? `<button class="item-btn" onclick="openItemModal('${item.id}')">EDITAR</button>` : ''}
-                        <button class="item-btn delete" onclick="deleteItem('${item.id}')">EXCLUIR</button>
+                        ${!item.isMasterItem ? `<button class="item-btn" onclick="openItemModal('${item.id}')" title="Editar">✏️</button>` : ''}
+                        <button class="item-btn delete" onclick="deleteItem('${item.id}')" title="Excluir">🗑️</button>
                     </div>
                     ${item.isMasterItem ? '<div class="item-master-badge" style="background:' + (item.color || 'var(--accent-color)') + '">Mestre</div>' : ''}
                 `;
@@ -3260,147 +3177,6 @@
                 document.getElementById('item-photo-placeholder').style.display = 'none';
             };
             reader.readAsDataURL(file);
-        }
-
-        // Drag and Drop
-        let draggedItemId = null;
-        function handleItemDragStart(e, id) {
-            draggedItemId = id;
-            e.target.classList.add('dragging');
-        }
-        function handleItemDragEnd(e) {
-            e.target.classList.remove('dragging');
-        }
-        function handleItemDrop(e) {
-            e.preventDefault();
-            const char = allCharacters[currentCharacterIndex];
-            const dropTarget = e.target.closest('.equipment-item');
-            if (!dropTarget) return;
-            
-            // Encontrar o ID do item alvo
-            const items = Array.from(document.querySelectorAll('.equipment-item'));
-            const targetIdx = items.indexOf(dropTarget);
-            const sourceIdx = char.items.findIndex(i => i.id == draggedItemId);
-            
-            if (sourceIdx !== -1 && targetIdx !== -1) {
-                const [removed] = char.items.splice(sourceIdx, 1);
-                char.items.splice(targetIdx, 0, removed);
-                saveAll();
-                renderEquipment();
-                syncPlayerData();
-            }
-        }
-
-        // Photoshop Color Picker Logic
-        let psPickerState = { h: 0, s: 100, v: 100, color: '#ff0000', onChange: null };
-        function initPsPicker(containerId, initialColor, onChange) {
-            const container = document.getElementById(containerId);
-            psPickerState.color = initialColor || '#ff0000';
-            psPickerState.onChange = onChange;
-            
-            container.innerHTML = `
-                <div class="ps-picker-container">
-                    <div class="ps-color-area" id="ps-area">
-                        <div class="ps-color-area-cursor" id="ps-area-cursor"></div>
-                    </div>
-                    <div class="ps-hue-slider" id="ps-hue">
-                        <div class="ps-hue-cursor" id="ps-hue-cursor"></div>
-                    </div>
-                    <div class="ps-preview-box">
-                        <div class="ps-label">NOVO</div>
-                        <div class="ps-current-color" id="ps-preview"></div>
-                        <div style="margin-top:10px;">
-                            <div class="ps-label">HEX</div>
-                            <input type="text" class="ps-hex-input" id="ps-hex" value="${psPickerState.color}">
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            const area = container.querySelector('#ps-area');
-            const hueSlider = container.querySelector('#ps-hue');
-            const hexInput = container.querySelector('#ps-hex');
-            
-            const updateUI = () => {
-                const rgb = hsvToRgb(psPickerState.h, psPickerState.s, psPickerState.v);
-                const hex = rgbToHex(rgb.r, rgb.g, rgb.b);
-                psPickerState.color = hex;
-                
-                area.style.backgroundColor = `hsl(${psPickerState.h}, 100%, 50%)`;
-                container.querySelector('#ps-preview').style.backgroundColor = hex;
-                hexInput.value = hex.toUpperCase();
-                
-                container.querySelector('#ps-area-cursor').style.left = psPickerState.s + '%';
-                container.querySelector('#ps-area-cursor').style.top = (100 - psPickerState.v) + '%';
-                container.querySelector('#ps-hue-cursor').style.top = (psPickerState.h / 360 * 100) + '%';
-                
-                if (psPickerState.onChange) psPickerState.onChange(hex);
-            };
-
-            const handleArea = (e) => {
-                const rect = area.getBoundingClientRect();
-                let x = (e.clientX - rect.left) / rect.width * 100;
-                let y = (e.clientY - rect.top) / rect.height * 100;
-                psPickerState.s = Math.max(0, Math.min(100, x));
-                psPickerState.v = Math.max(0, Math.min(100, 100 - y));
-                updateUI();
-            };
-
-            const handleHue = (e) => {
-                const rect = hueSlider.getBoundingClientRect();
-                let y = (e.clientY - rect.top) / rect.height * 360;
-                psPickerState.h = Math.max(0, Math.min(360, y));
-                updateUI();
-            };
-
-            area.onmousedown = (e) => { handleArea(e); document.onmousemove = handleArea; document.onmouseup = () => document.onmousemove = null; };
-            hueSlider.onmousedown = (e) => { handleHue(e); document.onmousemove = handleHue; document.onmouseup = () => document.onmousemove = null; };
-            hexInput.onchange = (e) => {
-                const hex = e.target.value;
-                if (/^#[0-9A-F]{6}$/i.test(hex)) {
-                    const hsv = hexToHsv(hex);
-                    psPickerState.h = hsv.h; psPickerState.s = hsv.s; psPickerState.v = hsv.v;
-                    updateUI();
-                }
-            };
-
-            // Init from color
-            const hsv = hexToHsv(psPickerState.color);
-            psPickerState.h = hsv.h; psPickerState.s = hsv.s; psPickerState.v = hsv.v;
-            updateUI();
-        }
-
-        function hsvToRgb(h, s, v) {
-            s /= 100; v /= 100;
-            let c = v * s;
-            let x = c * (1 - Math.abs((h / 60) % 2 - 1));
-            let m = v - c;
-            let r = 0, g = 0, b = 0;
-            if (h < 60) { r = c; g = x; }
-            else if (h < 120) { r = x; g = c; }
-            else if (h < 180) { g = c; b = x; }
-            else if (h < 240) { g = x; b = c; }
-            else if (h < 300) { r = x; b = c; }
-            else { r = c; b = x; }
-            return { r: Math.round((r + m) * 255), g: Math.round((g + m) * 255), b: Math.round((b + m) * 255) };
-        }
-        function rgbToHex(r, g, b) { return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1); }
-        function hexToHsv(hex) {
-            let r = parseInt(hex.slice(1, 3), 16) / 255;
-            let g = parseInt(hex.slice(3, 5), 16) / 255;
-            let b = parseInt(hex.slice(5, 7), 16) / 255;
-            let max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
-            let h, s = (max === 0 ? 0 : d / max), v = max;
-            if (max === min) h = 0;
-            else {
-                switch (max) {
-                    case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-                    case g: h = (b - r) / d + 2; break;
-                    case b: h = (r - g) / d + 4; break;
-                }
-                h /= 6;
-            }
-            return { h: h * 360, s: s * 100, v: v * 100 };
         }
 
         // ===== ATRIBUTOS =====
@@ -4430,11 +4206,7 @@
             
             const agora = Date.now();
             Object.values(jogadoresOnline).forEach(p => {
-                // Filtro mais rigoroso para personagens fantasmas: 30 segundos de inatividade
-                if (agora - (p.lastUpdate || 0) > 15000) {
-                    delete jogadoresOnline[p.id];
-                    return;
-                }
+                if (agora - (p.lastUpdate || 0) > 600000) return;
                 if (!iamTheMestre && p.hidden) return;
 
                 const card = document.createElement('div');
@@ -4497,7 +4269,7 @@
                             <button onclick="remoteHPAction('${p.id}', 'temp')" style="background:#58a6ff; border-color:#58a6ff; color:white;">Temp</button>
                         </div>
                         <div style="border-top:1px solid rgba(255,255,255,0.05); padding-top:8px; margin-top:5px;">
-                            <button onclick="openMasterItemHub('${p.id}')" style="font-size:10px; padding:4px; width:100%; border-color:var(--accent-color); color:var(--accent-color);">Adicionar Item</button>
+                            <button onclick="openMasterItemHub('${p.id}')" style="font-size:10px; padding:4px; width:100%; border-color:var(--accent-color); color:var(--accent-color);">🎁 Enviar Item Especial</button>
                         </div>
                     </div>` : ''}
                 `;
@@ -4524,8 +4296,19 @@
             currentTargetPlayerId = playerId;
             document.getElementById('condition-modal').style.display = 'flex';
             document.getElementById('custom-condition-name').value = '';
-            initPsPicker('ps-picker-condition', selectedConditionColor, (hex) => {
-                selectedConditionColor = hex;
+            
+            const palette = document.getElementById('condition-palette');
+            palette.innerHTML = '';
+            PALETTE_COLORS.forEach(color => {
+                const opt = document.createElement('div');
+                opt.className = 'color-option' + (color === selectedConditionColor ? ' selected' : '');
+                opt.style.background = color;
+                opt.onclick = () => {
+                    selectedConditionColor = color;
+                    document.querySelectorAll('.color-option').forEach(el => el.classList.remove('selected'));
+                    opt.classList.add('selected');
+                };
+                palette.appendChild(opt);
             });
         }
 
@@ -4649,10 +4432,25 @@
             document.getElementById('m-item-photo-preview').style.display = 'none';
             document.getElementById('m-item-photo-placeholder').style.display = 'block';
             
-            let selectedColor = '#58a6ff';
-            initPsPicker('ps-picker-item', selectedColor, (hex) => {
-                document.getElementById('master-item-modal').dataset.selectedColor = hex;
+            // Reset palette
+            const palette = document.getElementById('m-item-palette');
+            palette.innerHTML = '';
+            const colors = ['#ff4d4d', '#4dff88', '#58a6ff', '#ffd700', '#bc8cf2', '#ec4899', '#f97316', '#a855f7', '#3b82f6', '#ffffff'];
+            let selectedColor = colors[2]; // Default blue
+            
+            colors.forEach(color => {
+                const opt = document.createElement('div');
+                opt.className = 'color-option' + (color === selectedColor ? ' selected' : '');
+                opt.style.background = color;
+                opt.onclick = () => {
+                    selectedColor = color;
+                    palette.querySelectorAll('.color-option').forEach(el => el.classList.remove('selected'));
+                    opt.classList.add('selected');
+                };
+                palette.appendChild(opt);
             });
+            
+            // Store selected color in modal attribute for easy access
             document.getElementById('master-item-modal').dataset.selectedColor = selectedColor;
         }
 
@@ -4734,14 +4532,7 @@
 
         // Função de Reset do Painel
         function resetMestrePanel() {
-            // Limpar jogadores inativos e forçar re-renderização
-            const agora = Date.now();
-            Object.keys(jogadoresOnline).forEach(id => {
-                if (agora - (jogadoresOnline[id].lastUpdate || 0) > 5000) {
-                    delete jogadoresOnline[id];
-                }
-            });
-            
+            jogadoresOnline = {};
             expandedPlayers.clear();
             
             // Se eu era o mestre ou ao reiniciar a página, revogamos o título
@@ -4749,7 +4540,6 @@
                 if (iamTheMestre) {
                     mqttClient.publish(`dnd/mesa/${mesaCodigo}/_mestre`, JSON.stringify({ id: null }), { retain: true });
                 }
-                // Limpar tópicos antigos e re-inscrever
                 mqttClient.subscribe(`dnd/mesa/${mesaCodigo}/+`);
             }
             
@@ -4861,13 +4651,13 @@
 
     <!-- MODAL DE ENVIO DE ITEM PELO MESTRE -->
     <div id="master-item-modal" class="modal">
-        <div class="modal-content" style="max-width:400px;">
-            <h3 class="modal-title">Adicionar Item</h3>
+        <div class="modal-content" style="max-width:350px;">
+            <h3 class="modal-title">Presentear Item</h3>
             <div style="display:flex; flex-direction:column; gap:12px;">
                 <div style="display:flex; gap:15px; align-items:center;">
                     <div class="item-photo-box" style="width:70px; height:70px; cursor:pointer;" onclick="document.getElementById('m-item-photo-input').click()">
                         <img id="m-item-photo-preview" style="display:none;">
-                        <span id="m-item-photo-placeholder" style="color:#334155; font-size:30px;">📦</span>
+                        <span id="m-item-photo-placeholder" style="color:#334155; font-size:30px;">🎁</span>
                     </div>
                     <input type="file" id="m-item-photo-input" style="display:none;" accept="image/*" onchange="handleMasterItemPhoto(event)">
                     <div style="flex:1;">
@@ -4880,26 +4670,30 @@
                     <textarea id="m-item-desc" style="height:60px; resize:none;" placeholder="Poderes especiais..."></textarea>
                 </div>
                 <div>
-                    <label style="font-size:11px; color:#94a3b8; text-transform:uppercase;">Cor de Destaque (Estilo Photoshop)</label>
-                    <div id="ps-picker-item"></div>
+                    <label style="font-size:11px; color:#94a3b8; text-transform:uppercase;">Cor de Destaque</label>
+                    <div id="m-item-palette" class="color-palette" style="grid-template-columns: repeat(5, 1fr);">
+                        <!-- Cores via JS -->
+                    </div>
                 </div>
             </div>
             <div style="display:flex; gap:10px; margin-top:20px;">
                 <button onclick="closeMasterItemModal()" style="flex:1; border-color:#475569; color:#94a3b8;">Cancelar</button>
-                <button onclick="sendMasterItem()" style="flex:1;">Adicionar Item</button>
+                <button onclick="sendMasterItem()" style="flex:1;">Enviar Item</button>
             </div>
         </div>
     </div>
 
     <!-- MODAL DE CONDIÇÃO PERSONALIZADA -->
-    <div id="condition-modal" class="condition-modal" style="width:auto; max-width:450px;">
+    <div id="condition-modal" class="condition-modal">
         <h3 style="margin:0; color:var(--accent-color); font-size:16px;">Nova Condição</h3>
         <input type="text" id="custom-condition-name" placeholder="Ex: Envenenado" style="width:100%; background:rgba(0,0,0,0.3); border:1px solid var(--border-color); color:white; padding:8px; border-radius:6px;">
         <div>
-            <label style="font-size:12px; color:#64748b;">Escolha a Cor (Estilo Photoshop):</label>
-            <div id="ps-picker-condition"></div>
+            <label style="font-size:12px; color:#64748b;">Escolha a Cor:</label>
+            <div id="condition-palette" class="color-palette">
+                <!-- Cores serão inseridas via JS -->
+            </div>
         </div>
-        <div style="display:flex; gap:10px; margin-top:15px;">
+        <div style="display:flex; gap:10px; margin-top:5px;">
             <button onclick="closeConditionModal()" style="flex:1; background:#475569; border-color:#475569;">Cancelar</button>
             <button onclick="applyCustomCondition()" style="flex:1; background:var(--accent-color); border-color:var(--accent-color); color:#0f172a;">Concluir</button>
         </div>
