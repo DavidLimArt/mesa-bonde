@@ -1079,6 +1079,14 @@
             font-weight: 600;
         }
 
+
+        .char-dead {
+            opacity: 0.6 !important;
+        }
+
+        .char-dead .mestre-card-photo {
+            filter: grayscale(100%) !important;
+        }
         /* ===== RESPONSIVO ===== */
         @media (max-width: 1200px) {
             .ficha-content-grid { grid-template-columns: 1fr 1fr; }
@@ -4106,30 +4114,37 @@
                 if (!iamTheMestre && p.hidden) return;
 
                 const card = document.createElement('div');
-                card.className = 'mestre-card';
+                card.className = 'mestre-card ' + isDeadClass;
+                if (p.hp <= 0) card.style.cssText = deadStyle;
                 if (p.hidden) card.style.opacity = '0.6';
                 if (iamTheMestre) card.style.cursor = 'pointer';
                 
                 const isExpanded = expandedPlayers.has(p.id);
 
                 const hpPercent = (p.hp / p.hpMax) * 100;
-                let hpColor = hpPercent > 50 ? '#4dff88' : (hpPercent > 20 ? '#ffd700' : '#ff4d4d');
-                
-                // Sobrescrever cor se houver condição
-                if (p.condition && p.conditionColor) {
-                    hpColor = p.conditionColor;
+                // Prioritize condition color over HP color
+                let hpColor = '#4dff88';  // Default green
+                if (p.condition && p.conditionColor && p.condition !== 'Nenhuma') {
+                    hpColor = p.conditionColor;  // Condition color takes priority
+                } else {
+                    // Only apply HP-based colors if no condition
+                    hpColor = hpPercent > 50 ? '#4dff88' : (hpPercent > 20 ? '#ffd700' : '#ff4d4d');
                 }
 
                 const tempHPText = p.tempHP > 0 ? `<span style="color:#58a6ff"> (+${p.tempHP})</span>` : '';
+                const isDeadClass = p.hp <= 0 ? 'char-dead' : '';
+                const deadStyle = p.hp <= 0 ? 'opacity: 0.6;' : '';
+                const skullName = p.hp <= 0 ? '☠️ ' : '';
                 card.innerHTML = `
                     <div class="mestre-card-main" onclick="${iamTheMestre ? `toggleExpandPlayer('${p.id}')` : ''}">
+                        ${masterApplyMode ? `<div style="display:flex; align-items:center; margin-right:8px;"><input type="checkbox" style="cursor:pointer; width:18px; height:18px;" onchange="togglePlayerSelection('${p.id}')" ${masterSelectedPlayers.has(p.id) ? 'checked' : ''}></div>` : ''}
                         <div class="mestre-card-photo-container">
-                            <img src="${p.photo || ''}" class="mestre-card-photo" style="border-color:${hpColor}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%23334155%22/><text x=%2250%%22 y=%2250%%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22white%22 font-size=%2240%22>?</text></svg>'">
+                            <img src="${p.photo || ''}" class="mestre-card-photo" style="border-color:${hpColor}; ${p.hp <= 0 ? 'filter: grayscale(100%);' : ''}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%23334155%22/><text x=%2250%%22 y=%2250%%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22white%22 font-size=%2240%22>?</text></svg>'">
                             ${iamTheMestre ? `<div class="visibility-toggle" onclick="event.stopPropagation(); togglePlayerVisibility('${p.id}')">${p.hidden ? '👁️‍🗨️' : '👁️'}</div>` : ''}
                         </div>
                         <div style="flex:1">
                             <div style="font-weight:bold; color:${hpColor}; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                                ${p.name} <small style="color:#64748b; font-weight:normal;">Nív ${p.level || 1} ${p.class || ''}</small>
+                                ${skullName}${p.name} <small style="color:#64748b; font-weight:normal;">Nív ${p.level || 1} ${p.class || ''}</small>
                             </div>
                             <div style="display:flex; justify-content:space-between; margin-top:3px; font-size:11px;">
                                 <span>HP: ${p.hp}/${p.hpMax}${tempHPText}</span>
@@ -4149,6 +4164,7 @@
                         <div style="display:flex; gap:5px; align-items:center;">
                             <button onclick="promptCustomCondition('${p.id}')" style="font-size:9px; padding:2px 5px; flex:1;">➕ Condição</button>
                             <button onclick="setPlayerCondition('${p.id}', 'Nenhuma', '')" style="font-size:9px; padding:2px 5px; background:#475569; border-color:#475569;">Limpar</button>
+                            <button onclick="openMasterItemModal('${p.id}')" style="font-size:9px; padding:2px 5px; background:#9333ea; border-color:#9333ea;">📦 Item</button>
                         </div>
                         <div class="mestre-hp-controls">
                             <input type="text" id="hp-val-${p.id}" placeholder="1d6+5" onclick="event.stopPropagation()">
