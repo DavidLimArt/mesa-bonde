@@ -1167,9 +1167,9 @@
                 <button onclick="toggleLayoutWidth()" id="layoutWidthBtn">↔️ Layout: Centralizado</button>
             </div>
             <div class="character-controls-right">
+                <button onclick="toggleMestre()" style="border-color:#bc8cf2; color:#bc8cf2;">👁️ Painel Mestre</button>
                 <button onclick="syncPlayerData()" style="border-color:#58a6ff; color:#58a6ff;">🔄 Sincronizar</button>
                 <button onclick="exportCurrentCharacter()">💾 Salvar JSON</button>
-                <button class="destructive" onclick="deleteCurrentCharacter()">🗑️ Excluir Personagem</button>
             </div>
         </div>
 
@@ -2729,7 +2729,7 @@
                 document.getElementById(id).addEventListener('input', (e) => {
                     if (currentCharacterIndex === -1) return;
                     let val = e.target.value;
-                    const prop = id === 'charName' ? 'name' : id === 'charAC' ? 'armorClass' : id === 'charProf' ? 'proficiencyBonus' : id;
+                    const prop = id === 'charName' ? 'name' : id === 'charAC' ? 'armorClass' : id === 'charProf' ? 'proficiencyBonus' : id === 'charClass' ? 'class' : id === 'charLevel' ? 'level' : id;
                     if (['charLevel', 'charAC', 'charSpeed', 'charProf', 'charInspiration'].includes(id)) val = parseInt(val) || 0;
                     allCharacters[currentCharacterIndex][prop] = val;
                     saveAll();
@@ -2847,7 +2847,7 @@
         function loadCharacterData(char) {
             const ids = ['charName', 'playerName', 'charClass', 'charRace', 'charLevel', 'charBackground', 'charAlignment', 'charAC', 'charSpeed', 'charProf', 'charInspiration', 'traits', 'ideals', 'bonds', 'flaws', 'features', 'equipment', 'notes'];
             ids.forEach(id => {
-                const prop = id === 'charName' ? 'name' : id === 'charAC' ? 'armorClass' : id === 'charProf' ? 'proficiencyBonus' : id;
+                const prop = id === 'charName' ? 'name' : id === 'charAC' ? 'armorClass' : id === 'charProf' ? 'proficiencyBonus' : id === 'charClass' ? 'class' : id === 'charLevel' ? 'level' : id;
                 document.getElementById(id).value = char[prop] || '';
             });
 
@@ -3685,8 +3685,11 @@
                 name: char.name || "Sem Nome",
                 hp: char.hitPoints || 0,
                 hpMax: char.maxHitPoints || 0,
+                tempHP: char.tempHP || 0,
                 ac: char.armorClass || 0,
                 class: char.class || "",
+                level: char.level || 1,
+                photo: char.photo || "",
                 lastUpdate: Date.now()
             };
             // Encode seguro para caracteres especiais/acentos
@@ -3715,17 +3718,28 @@
 
                 const card = document.createElement('div');
                 card.className = 'mestre-card';
+                card.style.display = 'flex';
+                card.style.gap = '10px';
+                card.style.alignItems = 'center';
+
                 const hpPercent = (p.hp / p.hpMax) * 100;
                 const hpColor = hpPercent > 50 ? '#4dff88' : (hpPercent > 20 ? '#ffd700' : '#ff4d4d');
+                const tempHPText = p.tempHP > 0 ? `<span style="color:#58a6ff"> (+${p.tempHP})</span>` : '';
                 
                 card.innerHTML = `
-                    <div style="font-weight:bold; color:var(--accent-color)">${p.name} <small style="color:#64748b">(${p.class})</small></div>
-                    <div style="display:flex; justify-content:space-between; margin-top:5px; font-size:12px;">
-                        <span>HP: ${p.hp}/${p.hpMax}</span>
-                        <span>CA: ${p.ac}</span>
-                    </div>
-                    <div style="width:100%; height:6px; background:#334155; border-radius:3px; margin-top:5px; overflow:hidden;">
-                        <div style="width:${Math.min(100, hpPercent)}%; height:100%; background:${hpColor}; transition: width 0.3s;"></div>
+                    <img src="${p.photo || ''}" style="width:45px; height:45px; border-radius:4px; object-fit:cover; border:1px solid var(--accent-color); background:var(--card-bg);" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%23334155%22/><text x=%2250%%22 y=%2250%%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22white%22 font-size=%2240%22>?</text></svg>'">
+                    <div style="flex:1">
+                        <div style="font-weight:bold; color:var(--accent-color); font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                            ${p.name} <small style="color:#64748b; font-weight:normal;">Nív ${p.level || 1} ${p.class || ''}</small>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; margin-top:3px; font-size:11px;">
+                            <span>HP: ${p.hp}/${p.hpMax}${tempHPText}</span>
+                            <span>🛡️ ${p.ac}</span>
+                        </div>
+                        <div style="width:100%; height:5px; background:#334155; border-radius:3px; margin-top:4px; overflow:hidden; position:relative;">
+                            <div style="width:${Math.min(100, hpPercent)}%; height:100%; background:${hpColor}; transition: width 0.3s;"></div>
+                            ${p.tempHP > 0 ? `<div style="position:absolute; top:0; left:0; width:${Math.min(100, (p.tempHP / p.hpMax) * 100)}%; height:100%; background:rgba(88, 166, 255, 0.5); border-right:1px solid #58a6ff;"></div>` : ''}
+                        </div>
                     </div>
                 `;
                 list.appendChild(card);
@@ -3746,10 +3760,59 @@
                 syncPlayerData();
             }
         }, 30000);
+
+        // Função de Reset do Painel
+        function resetMestrePanel() {
+            jogadoresOnline = {};
+            renderMestrePanel();
+            if (mqttClient && mqttClient.connected) {
+                // Força uma nova subscrição para tentar captar quem está online com retain
+                mqttClient.subscribe(`dnd/mesa/${mesaCodigo}/+`);
+            }
+        }
+
+        // Função para tornar o painel arrastável
+        function makeDraggable(el, handle) {
+            let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+            handle.onmousedown = dragMouseDown;
+
+            function dragMouseDown(e) {
+                e = e || window.event;
+                e.preventDefault();
+                pos3 = e.clientX;
+                pos4 = e.clientY;
+                document.onmouseup = closeDragElement;
+                document.onmousemove = elementDrag;
+            }
+
+            function elementDrag(e) {
+                e = e || window.event;
+                e.preventDefault();
+                pos1 = pos3 - e.clientX;
+                pos2 = pos4 - e.clientY;
+                pos3 = e.clientX;
+                pos4 = e.clientY;
+                el.style.top = (el.offsetTop - pos2) + "px";
+                el.style.left = (el.offsetLeft - pos1) + "px";
+                el.style.right = 'auto'; // Remove o right:20px inicial
+            }
+
+            function closeDragElement() {
+                document.onmouseup = null;
+                document.onmousemove = null;
+            }
+        }
+
+        // Inicializa o arraste quando o documento carregar
+        document.addEventListener('DOMContentLoaded', () => {
+            const panel = document.getElementById('mestre-panel');
+            const header = document.getElementById('mestre-panel-header');
+            if (panel && header) makeDraggable(panel, header);
+        });
     </script>
     <!-- UI DO PAINEL DO MESTRE -->
-    <div id="mestre-panel" style="display:none; position:fixed; top:20px; right:20px; width:250px; background:var(--card-bg); border:2px solid var(--accent-color); border-radius:12px; padding:15px; z-index:9999; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+    <div id="mestre-panel" style="display:none; position:fixed; top:20px; right:20px; width:280px; background:var(--card-bg); border:2px solid var(--accent-color); border-radius:12px; padding:15px; z-index:9999; box-shadow: 0 10px 30px rgba(0,0,0,0.5); cursor: default;">
+        <div id="mestre-panel-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; cursor: move; user-select: none; padding-bottom: 5px; border-bottom: 1px solid var(--border-color);">
             <div style="display:flex; align-items:center; gap:8px;">
                 <div id="status-dot" style="width:8px; height:8px; border-radius:50%; background:#64748b;"></div>
                 <strong style="color:var(--accent-color)">Painel do Mestre</strong>
@@ -3761,7 +3824,7 @@
         </div>
         <div style="margin-top:10px; font-size:10px; color:#64748b; border-top:1px solid var(--border-color); padding-top:5px; display:flex; justify-content:space-between;">
             <span>Mesa: <span id="mesa-display"></span></span>
-            <span onclick="syncPlayerData()" style="cursor:pointer; color:var(--accent-color)">🔄 Atualizar</span>
+            <span onclick="resetMestrePanel()" style="cursor:pointer; color:var(--accent-color)">🔄 Resetar</span>
         </div>
     </div>
 
