@@ -3662,10 +3662,13 @@
         let mestreId = null;
         let hiddenPlayers = new Set();
         let expandedPlayers = new Set();
+        let currentTargetPlayerId = null;
+        let selectedConditionColor = '#ff4d4d';
         
-        let CUSTOM_CONDITIONS = {
-            'Nenhuma': { color: '', emoji: '🛡️' }
-        };
+        const PALETTE_COLORS = [
+            '#ff4d4d', '#4dff88', '#58a6ff', '#ffd700', '#bc8cf2',
+            '#ec4899', '#f97316', '#a855f7', '#3b82f6', '#334155'
+        ];
 
         function initOnline() {
             if (mqttClient && mqttClient.connected) {
@@ -3904,8 +3907,6 @@
                 }
 
                 const tempHPText = p.tempHP > 0 ? `<span style="color:#58a6ff"> (+${p.tempHP})</span>` : '';
-                const conditionEmoji = p.condition && p.condition !== 'Nenhuma' ? '⚠️ ' : '';
-                
                 card.innerHTML = `
                     <div class="mestre-card-main" onclick="${iamTheMestre ? `toggleExpandPlayer('${p.id}')` : ''}">
                         <div class="mestre-card-photo-container">
@@ -3914,7 +3915,7 @@
                         </div>
                         <div style="flex:1">
                             <div style="font-weight:bold; color:${hpColor}; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                                ${conditionEmoji}${p.name} <small style="color:#64748b; font-weight:normal;">Nív ${p.level || 1} ${p.class || ''}</small>
+                                ${p.name} <small style="color:#64748b; font-weight:normal;">Nív ${p.level || 1} ${p.class || ''}</small>
                             </div>
                             <div style="display:flex; justify-content:space-between; margin-top:3px; font-size:11px;">
                                 <span>HP: ${p.hp}/${p.hpMax}${tempHPText}</span>
@@ -3963,11 +3964,37 @@
         }
 
         function promptCustomCondition(playerId) {
-            const name = prompt("Nome da Condição (ex: Envenenado, Sangrando):");
-            if (!name) return;
-            const color = prompt("Cor da Condição (Hex, ex: #ff0000 para vermelho):", "#ff0000");
-            if (!color) return;
-            setPlayerCondition(playerId, name, color);
+            currentTargetPlayerId = playerId;
+            document.getElementById('condition-modal').style.display = 'flex';
+            document.getElementById('custom-condition-name').value = '';
+            
+            const palette = document.getElementById('condition-palette');
+            palette.innerHTML = '';
+            PALETTE_COLORS.forEach(color => {
+                const opt = document.createElement('div');
+                opt.className = 'color-option' + (color === selectedConditionColor ? ' selected' : '');
+                opt.style.background = color;
+                opt.onclick = () => {
+                    selectedConditionColor = color;
+                    document.querySelectorAll('.color-option').forEach(el => el.classList.remove('selected'));
+                    opt.classList.add('selected');
+                };
+                palette.appendChild(opt);
+            });
+        }
+
+        function closeConditionModal() {
+            document.getElementById('condition-modal').style.display = 'none';
+        }
+
+        function applyCustomCondition() {
+            const name = document.getElementById('custom-condition-name').value.trim();
+            if (!name) {
+                alert("Digite o nome da condição!");
+                return;
+            }
+            setPlayerCondition(currentTargetPlayerId, name, selectedConditionColor);
+            closeConditionModal();
         }
 
         function setPlayerCondition(playerId, condition, color) {
@@ -4193,8 +4220,66 @@
             <span onclick="resetMestrePanel()" style="cursor:pointer; color:var(--accent-color)">🔄 Resetar</span>
         </div>
     </div>
+    
+    <!-- MODAL DE CONDIÇÃO PERSONALIZADA -->
+    <div id="condition-modal" class="condition-modal">
+        <h3 style="margin:0; color:var(--accent-color); font-size:16px;">Nova Condição</h3>
+        <input type="text" id="custom-condition-name" placeholder="Ex: Envenenado" style="width:100%; background:rgba(0,0,0,0.3); border:1px solid var(--border-color); color:white; padding:8px; border-radius:6px;">
+        <div>
+            <label style="font-size:12px; color:#64748b;">Escolha a Cor:</label>
+            <div id="condition-palette" class="color-palette">
+                <!-- Cores serão inseridas via JS -->
+            </div>
+        </div>
+        <div style="display:flex; gap:10px; margin-top:5px;">
+            <button onclick="closeConditionModal()" style="flex:1; background:#475569; border-color:#475569;">Cancelar</button>
+            <button onclick="applyCustomCondition()" style="flex:1; background:var(--accent-color); border-color:var(--accent-color); color:#0f172a;">Concluir</button>
+        </div>
+    </div>
 
     <style>
+        .condition-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--card-bg);
+            border: 2px solid var(--accent-color);
+            border-radius: 12px;
+            padding: 20px;
+            z-index: 10001;
+            width: 250px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+            display: none;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .color-palette {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+            margin-top: 5px;
+        }
+
+        .color-option {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .color-option:hover {
+            transform: scale(1.1);
+        }
+
+        .color-option.selected {
+            border-color: white;
+            box-shadow: 0 0 10px rgba(255,255,255,0.5);
+        }
+
         .mestre-card {
             background: rgba(15, 23, 42, 0.6);
             border: 1px solid var(--border-color);
