@@ -1360,6 +1360,7 @@
                     <button onclick="exportAllCharacters()">Exportar Backup</button>
                     <button onclick="document.getElementById('importFile').click()">Importar Backup</button>
                     <input type="file" id="importFile" style="display:none" onchange="importAllCharacters(event)">
+                    <button id="mute-btn" onclick="toggleMute()" style="border-color:#64748b; color:#64748b; width:40px; padding:8px 0;">🔊</button>
                 </div>
         </div>
 
@@ -2780,6 +2781,32 @@
                 event.target.style.display = "none";
             }
         });
+
+        // ===== SISTEMA DE SOM =====
+        const AUDIO_SFX = {
+            click: "https://www.soundjay.com/buttons/sounds/button-16.mp3",
+            success: "https://www.soundjay.com/buttons/sounds/button-3.mp3",
+            action: "https://www.soundjay.com/buttons/sounds/button-09.mp3",
+            damage: "https://www.soundjay.com/misc/sounds/punch-02.mp3",
+            heal: "https://www.soundjay.com/buttons/sounds/button-10.mp3",
+            notification: "https://www.soundjay.com/buttons/sounds/beep-07.mp3",
+            whisper: "https://www.soundjay.com/communication/sounds/pager-beep-1.mp3"
+        };
+        let isMuted = false;
+
+        function playSFX(type) {
+            if (isMuted) return;
+            const audio = new Audio(AUDIO_SFX[type]);
+            audio.volume = 0.3;
+            audio.play().catch(e => console.log("Erro ao tocar som:", e));
+        }
+
+        function toggleMute() {
+            isMuted = !isMuted;
+            const btn = document.getElementById('mute-btn');
+            btn.innerText = isMuted ? '🔇' : '🔊';
+            playSFX('click');
+        }
 
         // ===== ESTADO GLOBAL =====
         let allCharacters = [];
@@ -4438,6 +4465,7 @@
             isMestre = !isMestre;
             const panel = document.getElementById('mestre-panel');
             panel.style.display = isMestre ? 'block' : 'none';
+            playSFX('click');
             if (isMestre) {
                 if (!mqttClient || !mqttClient.connected) {
                     const confirmMestre = confirm("Você não está conectado a uma mesa. Deseja conectar agora para usar o Painel do Mestre?");
@@ -4449,6 +4477,13 @@
 
         function renderMestrePanel() {
             const list = document.getElementById('mestre-list');
+            
+            // Salvar valores atuais dos inputs para não perder durante a digitação
+            const currentInputs = {};
+            list.querySelectorAll('input').forEach(input => {
+                currentInputs[input.id] = input.value;
+            });
+
             list.innerHTML = '';
             
             const agora = Date.now();
@@ -4521,6 +4556,12 @@
                     </div>` : ''}
                 `;
                 list.appendChild(card);
+
+                // Restaurar valor do input se ele existia e o usuário está digitando
+                const input = document.getElementById(`hp-val-${p.id}`);
+                if (input && currentInputs[input.id] !== undefined && document.activeElement === input) {
+                    input.value = currentInputs[input.id];
+                }
             });
             document.getElementById('mesa-display').innerText = mesaCodigo;
             
@@ -4537,6 +4578,7 @@
             if (expandedPlayers.has(playerId)) expandedPlayers.delete(playerId);
             else expandedPlayers.add(playerId);
             renderMestrePanel();
+            playSFX('click');
         }
 
         function promptCustomCondition(playerId) {
@@ -4768,6 +4810,131 @@
         }, 5000);
 
         // Função de Reset do Painel
+        function switchMestreTab(tab) {
+            document.getElementById('mestre-players-view').style.display = tab === 'players' ? 'block' : 'none';
+            document.getElementById('mestre-bestiary-view').style.display = tab === 'bestiary' ? 'block' : 'none';
+            
+            document.getElementById('tab-mestre-players').style.background = tab === 'players' ? 'var(--accent-color)' : 'transparent';
+            document.getElementById('tab-mestre-players').style.color = tab === 'players' ? 'var(--bg-color)' : 'var(--accent-color)';
+            
+            document.getElementById('tab-mestre-bestiary').style.background = tab === 'bestiary' ? 'var(--accent-color)' : 'transparent';
+            document.getElementById('tab-mestre-bestiary').style.color = tab === 'bestiary' ? 'var(--bg-color)' : 'var(--accent-color)';
+            
+            if (tab === 'bestiary') renderBestiary();
+            playSFX('click');
+        }
+
+        function openMonsterModal() {
+            document.getElementById('monster-modal').style.display = 'flex';
+            document.getElementById('monster-name').value = '';
+            document.getElementById('monster-level').value = '';
+            document.getElementById('monster-class').value = '';
+            document.getElementById('monster-hp-max').value = '';
+            document.getElementById('monster-ac').value = '';
+            document.getElementById('monster-photo').value = '';
+            playSFX('click');
+        }
+
+        function saveMonster() {
+            const monster = {
+                id: 'm-' + Date.now(),
+                name: document.getElementById('monster-name').value || 'Monstro',
+                level: document.getElementById('monster-level').value || '1',
+                class: document.getElementById('monster-class').value || 'Inimigo',
+                hpMax: parseInt(document.getElementById('monster-hp-max').value) || 10,
+                hp: parseInt(document.getElementById('monster-hp-max').value) || 10,
+                ac: parseInt(document.getElementById('monster-ac').value) || 10,
+                photo: document.getElementById('monster-photo').value || '',
+                tempHP: 0,
+                condition: 'Nenhuma',
+                conditionColor: ''
+            };
+            mestreMonsters.push(monster);
+            localStorage.setItem('mestreMonsters', JSON.stringify(mestreMonsters));
+            document.getElementById('monster-modal').style.display = 'none';
+            renderBestiary();
+            playSFX('success');
+        }
+
+        function renderBestiary() {
+            const list = document.getElementById('mestre-monster-list');
+            list.innerHTML = '';
+            
+            if (mestreMonsters.length === 0) {
+                list.innerHTML = '<div style="font-size:12px; color:#64748b; text-align:center;">Nenhum monstro salvo.</div>';
+                return;
+            }
+
+            mestreMonsters.forEach((m, idx) => {
+                const isDead = m.hp <= 0;
+                const hpPercent = (m.hp / m.hpMax) * 100;
+                let hpColor = hpPercent > 50 ? '#4dff88' : (hpPercent > 20 ? '#ffd700' : '#ff4d4d');
+                if (m.conditionColor) hpColor = m.conditionColor;
+
+                const card = document.createElement('div');
+                card.className = 'mestre-card';
+                if (isDead) {
+                    card.style.filter = 'grayscale(100%)';
+                    card.style.opacity = '0.8';
+                }
+
+                card.innerHTML = `
+                    <div class="mestre-card-main">
+                        <div class="mestre-card-photo-container">
+                            <img src="${m.photo}" class="mestre-card-photo" style="border-color:${isDead ? '#64748b' : hpColor}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%23334155%22/><text x=%2250%%22 y=%2250%%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22white%22 font-size=%2240%22>?</text></svg>'">
+                            <div class="visibility-toggle" onclick="deleteMonster('${m.id}')" style="background:#ef4444; border-radius:50%; width:16px; height:16px; display:flex; align-items:center; justify-content:center; font-size:10px; position:absolute; top:-5px; right:-5px; cursor:pointer;">×</div>
+                        </div>
+                        <div style="flex:1">
+                            <div style="font-weight:bold; color:${isDead ? '#94a3b8' : hpColor}; font-size:13px;">
+                                ${m.name} <small style="color:#64748b;">CR ${m.level}</small>
+                            </div>
+                            <div style="display:flex; justify-content:space-between; margin-top:3px; font-size:11px;">
+                                <span>HP: ${m.hp}/${m.hpMax}</span>
+                                <span>🛡️ ${m.ac}</span>
+                            </div>
+                            <div style="width:100%; height:5px; background:#334155; border-radius:3px; margin-top:4px; overflow:hidden;">
+                                <div style="width:${Math.max(0, Math.min(100, hpPercent))}%; height:100%; background:${isDead ? '#475569' : hpColor};"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mestre-hp-hub" style="margin-top:5px; padding:5px; background:rgba(0,0,0,0.2); border-radius:5px;">
+                        <div style="display:flex; gap:5px; margin-bottom:5px;">
+                            <input type="text" id="monster-hp-val-${m.id}" placeholder="Dano/Cura" style="font-size:9px; padding:2px;">
+                            <button onclick="monsterHPAction('${m.id}', 'damage')" style="padding:2px 5px; font-size:9px; background:#ff4d4d; border-color:#ff4d4d; color:white;">-</button>
+                            <button onclick="monsterHPAction('${m.id}', 'heal')" style="padding:2px 5px; font-size:9px; background:#4dff88; border-color:#4dff88; color:#0f172a;">+</button>
+                        </div>
+                    </div>
+                `;
+                list.appendChild(card);
+            });
+        }
+
+        function monsterHPAction(id, type) {
+            const m = mestreMonsters.find(x => x.id === id);
+            if (!m) return;
+            const input = document.getElementById(`monster-hp-val-${id}`);
+            const val = parseInt(input.value) || 0;
+            if (type === 'damage') {
+                m.hp = Math.max(0, m.hp - val);
+                playSFX('damage');
+            } else {
+                m.hp = Math.min(m.hpMax, m.hp + val);
+                playSFX('heal');
+            }
+            input.value = '';
+            localStorage.setItem('mestreMonsters', JSON.stringify(mestreMonsters));
+            renderBestiary();
+        }
+
+        function deleteMonster(id) {
+            if (confirm("Remover este monstro do bestiário?")) {
+                mestreMonsters = mestreMonsters.filter(m => m.id !== id);
+                localStorage.setItem('mestreMonsters', JSON.stringify(mestreMonsters));
+                renderBestiary();
+                playSFX('action');
+            }
+        }
+
         function resetMestrePanel() {
             jogadoresOnline = {};
             expandedPlayers.clear();
@@ -4837,7 +5004,7 @@
         });
     </script>
     <!-- UI DO PAINEL DO MESTRE -->
-    <div id="mestre-panel" style="display:none; position:fixed; top:20px; right:20px; width:280px; background:var(--card-bg); border:2px solid var(--accent-color); border-radius:12px; padding:15px; z-index:9999; box-shadow: 0 10px 30px rgba(0,0,0,0.5); cursor: default;">
+    <div id="mestre-panel" style="display:none; position:fixed; top:20px; right:20px; width:300px; background:var(--card-bg); border:2px solid var(--accent-color); border-radius:12px; padding:15px; z-index:9999; box-shadow: 0 10px 30px rgba(0,0,0,0.5); cursor: default;">
         <div id="mestre-panel-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; cursor: move; user-select: none; padding-bottom: 5px; border-bottom: 1px solid var(--border-color);">
             <div style="display:flex; align-items:center; gap:8px;">
                 <div id="status-dot" style="width:8px; height:8px; border-radius:50%; background:#64748b;"></div>
@@ -4846,8 +5013,23 @@
             </div>
             <button onclick="toggleMestre()" style="padding:2px 8px; font-size:10px;">X</button>
         </div>
-        <div id="mestre-list" style="display:flex; flex-direction:column; gap:10px; max-height:400px; overflow-y:auto;">
-            <div style="font-size:12px; color:#64748b; text-align:center;">Aguardando jogadores...</div>
+
+        <div style="display:flex; gap:5px; margin-bottom:10px; border-bottom:1px solid var(--border-color); padding-bottom:10px;">
+            <button onclick="switchMestreTab('players')" id="tab-mestre-players" style="flex:1; font-size:10px; padding:4px; background:var(--accent-color); color:var(--bg-color);">Jogadores</button>
+            <button onclick="switchMestreTab('bestiary')" id="tab-mestre-bestiary" style="flex:1; font-size:10px; padding:4px;">Bestiário</button>
+        </div>
+
+        <div id="mestre-players-view">
+            <div id="mestre-list" style="display:flex; flex-direction:column; gap:10px; max-height:400px; overflow-y:auto;">
+                <div style="font-size:12px; color:#64748b; text-align:center;">Aguardando jogadores...</div>
+            </div>
+        </div>
+
+        <div id="mestre-bestiary-view" style="display:none;">
+            <button onclick="openMonsterModal()" style="width:100%; font-size:10px; margin-bottom:10px; border-style:dashed;">+ Adicionar Monstro</button>
+            <div id="mestre-monster-list" style="display:flex; flex-direction:column; gap:10px; max-height:400px; overflow-y:auto;">
+                <!-- Monstros aqui -->
+            </div>
         </div>
         <div style="margin-top:10px; font-size:10px; color:#64748b; border-top:1px solid var(--border-color); padding-top:5px; display:flex; justify-content:space-between;">
             <span>Mesa: <span id="mesa-display"></span></span>
@@ -4883,6 +5065,31 @@
                 <button onclick="closeItemModal()" style="flex:1; border-color:#475569; color:#94a3b8;">Cancelar</button>
                 <button onclick="saveItem()" style="flex:1;">Salvar Item</button>
             </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE SUSSURRO -->
+    <div id="whisper-modal" class="modal">
+        <div class="modal-content" style="max-width:400px;">
+            <div class="modal-title">💬 Enviar Sussurro</div>
+            <div class="form-group">
+                <label>Mensagem Privada</label>
+                <textarea id="whisper-message" rows="3" placeholder="Escreva algo importante apenas para este jogador..."></textarea>
+            </div>
+            <div style="display:flex; gap:10px; margin-top:20px;">
+                <button onclick="sendWhisper()" style="flex:1; background:var(--accent-color); color:var(--bg-color);">Enviar Sussurro</button>
+                <button onclick="document.getElementById('whisper-modal').style.display='none'" style="flex:1; border-color:#64748b; color:#64748b;">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- NOTIFICAÇÃO DE SUSSURRO RECEBIDO -->
+    <div id="whisper-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:10000; justify-content:center; align-items:center; backdrop-filter:blur(10px);">
+        <div style="background:var(--card-bg); border:2px solid #bc8cf2; padding:40px; border-radius:20px; max-width:500px; width:90%; text-align:center; box-shadow: 0 0 50px rgba(188, 140, 242, 0.3);">
+            <div style="font-size:40px; margin-bottom:20px;">💬</div>
+            <div style="color:#bc8cf2; text-transform:uppercase; letter-spacing:2px; font-size:12px; font-weight:bold; margin-bottom:10px;">Sussurro do Mestre</div>
+            <div id="whisper-content" style="font-size:20px; line-height:1.5; color:white; font-style:italic; margin-bottom:30px;"></div>
+            <button onclick="document.getElementById('whisper-overlay').style.display='none'" style="background:#bc8cf2; color:var(--bg-color); border:none; padding:10px 30px; font-weight:bold; border-radius:30px;">Entendido</button>
         </div>
     </div>
 
