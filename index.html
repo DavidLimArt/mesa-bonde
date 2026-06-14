@@ -1045,38 +1045,6 @@
             letter-spacing: 1px;
         }
 
-        /* Pop-up do Mestre (Esquerda) */
-        .dice-result-popup.mestre-secret {
-            left: auto;
-            right: 105%;
-            border-color: #ffd700; /* Dourado */
-        }
-
-        /* Janela Flutuante do Mestre */
-        #mestre-dice-window {
-            position: fixed;
-            top: 100px;
-            left: 20px;
-            width: 260px;
-            background: var(--card-bg);
-            border: 2px solid #ffd700;
-            border-radius: 12px;
-            padding: 12px;
-            z-index: 10000;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
-            display: none;
-        }
-        .mestre-window-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-            cursor: move;
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 5px;
-            user-select: none;
-        }
-
         .dice-result-name {
             font-size: 10px;
             text-transform: uppercase;
@@ -1600,18 +1568,8 @@
         <div class="character-controls-bar">
             <div class="character-controls-left">
                 <button onclick="closeCharacter()">⬅️ Voltar</button>
+                <button onclick="toggleLayoutWidth()" id="layoutWidthBtn">↔️ Layout: Centralizado</button>
             </div>
-            
-            <!-- Hub de Rolagem Superior (Ficha) -->
-            <div class="custom-roll-hub" style="flex: 1; max-width: 400px; margin: 0 20px;">
-                <div class="roll-select-container">
-                    <input type="text" id="roll-name" class="roll-name-input" placeholder="Rolagem" onclick="toggleRollsDropdown(event)" style="background: #1e293b; border-color: #4dff88;">
-                    <div id="rolls-dropdown" class="rolls-dropdown"></div>
-                </div>
-                <input type="text" id="roll-value" class="roll-value-input" placeholder="Dado" style="background: #1e293b; border-color: #58a6ff;">
-                <button class="roll-btn-red" onclick="executeCustomRoll()" style="padding: 0 15px;">ROLAR 🎲</button>
-            </div>
-
             <div class="character-controls-right">
                 <button onclick="toggleMestre()" style="border-color:#bc8cf2; color:#bc8cf2;">👁️ Painel Mestre</button>
                 <button onclick="syncPlayerData()" style="border-color:#58a6ff; color:#58a6ff;">🔄 Sincronizar</button>
@@ -1658,7 +1616,19 @@
                             </div>
                             <div class="ficha-detail-item">
                                 <span class="ficha-detail-label">⚖️ Tendência</span>
-                                <input type="text" id="charAlignment" placeholder="Tendência">
+                                <div style="display:flex; gap:10px; align-items:center;">
+                                    <input type="text" id="charAlignment" placeholder="Tendência" style="flex:1;">
+                                    
+                                    <!-- Hub de Rolagem Compacto -->
+                                    <div class="custom-roll-hub" style="flex:1.5;">
+                                        <div class="roll-select-container">
+                                            <input type="text" id="roll-name" class="roll-name-input" placeholder="Rolagem" onclick="toggleRollsDropdown(event)">
+                                            <div id="rolls-dropdown" class="rolls-dropdown"></div>
+                                        </div>
+                                        <input type="text" id="roll-value" class="roll-value-input" placeholder="Dado">
+                                        <button class="roll-btn-red" onclick="executeCustomRoll()">🎲</button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1745,6 +1715,20 @@
                                 </div>
                             </div>
                             <div class="death-saves-title">Testes Contra a Morte</div>
+                        </div>
+
+                        <!-- Hub de Rolagem Completo (Abaixo dos Testes de Morte) -->
+                        <div class="ficha-roll-hub-full" style="margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 15px;">
+                            <div class="custom-roll-hub" style="width: 100%; display: flex; gap: 10px; flex-direction: column;">
+                                <div class="roll-select-container" style="width: 100%;">
+                                    <input type="text" id="roll-name" class="roll-name-input" placeholder="Nome da Rolagem (ex: Ataque Espada)" onclick="toggleRollsDropdown(event)" style="width: 100%; background: #1e293b; border-color: #4dff88;">
+                                    <div id="rolls-dropdown" class="rolls-dropdown"></div>
+                                </div>
+                                <div style="display: flex; gap: 10px; width: 100%;">
+                                    <input type="text" id="roll-value" class="roll-value-input" placeholder="Dado (ex: 1d20+5)" style="flex: 1; background: #1e293b; border-color: #58a6ff;">
+                                    <button class="roll-btn-red" onclick="executeCustomRoll()" style="padding: 0 20px; min-width: 120px;">ROLAR 🎲</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -3349,11 +3333,6 @@
             document.getElementById('character-screen').style.display = 'block';
             isEditMode = false; // Reset modo edição ao abrir
             loadCharacterData(char);
-            
-            // Sincronização Automática: Se estiver conectado, manda pra mesa
-            if (mqttClient && mqttClient.connected) {
-                syncPlayerData();
-            }
         }
 
         function closeCharacter() {
@@ -3825,26 +3804,26 @@
             playSFX('action');
         }
 
-        function showDiceAnimation(charName, rollName, rollCalc, result, natural) {
-            const safeId = btoa(unescape(encodeURIComponent(charName))).replace(/[/+=]/g, '');
-            let card = document.querySelector(`[data-player-id="${safeId}"]`);
-            
-            if (!card && currentCharacterIndex !== -1) {
-                const char = allCharacters[currentCharacterIndex];
-                if (char && char.name === charName) {
-                    card = document.getElementById('fichaHeader');
-                }
-            }
-            
-            if (card) {
-                const old = card.querySelector('.dice-result-popup');
-                if (old) old.remove();
+        function showDiceAnimation(charName, rollName, rollCalc, result, natural, isMestreRoll = false) {
+            let card = null;
+            let nameColor = 'var(--accent-color)';
+            let displayName = charName;
 
-                const popup = document.createElement('div');
-                popup.className = 'dice-result-popup';
+            if (isMestreRoll) {
+                card = document.getElementById('mestre-panel');
+                nameColor = '#ffd700';
+                displayName = 'Mestre 👑';
+            } else {
+                const safeId = btoa(unescape(encodeURIComponent(charName))).replace(/[/+=]/g, '');
+                card = document.querySelector(`[data-player-id="${safeId}"]`);
                 
-                // Determinar cor do nome baseada no status online
-                let nameColor = 'var(--accent-color)';
+                if (!card && currentCharacterIndex !== -1) {
+                    const char = allCharacters[currentCharacterIndex];
+                    if (char && char.name === charName) {
+                        card = document.getElementById('fichaHeader');
+                    }
+                }
+
                 const onlineData = jogadoresOnline[safeId];
                 if (onlineData) {
                     const hpPerc = (onlineData.hp / onlineData.hpMax) * 100;
@@ -3853,7 +3832,15 @@
                         nameColor = onlineData.conditionColor;
                     }
                 }
+            }
+            
+            if (card) {
+                const oldPopups = card.querySelectorAll('.dice-result-popup');
+                oldPopups.forEach(p => p.remove());
 
+                const popup = document.createElement('div');
+                popup.className = 'dice-result-popup' + (isMestreRoll ? ' mestre-secret' : '');
+                
                 let critClass = '';
                 if (rollCalc.toLowerCase().includes('1d20')) {
                     if (natural === 20) critClass = 'crit-success';
@@ -3861,7 +3848,7 @@
                 }
 
                 popup.innerHTML = `
-                    <div class="dice-result-char" style="color:${nameColor}">${charName}</div>
+                    <div class="dice-result-char" style="color:${nameColor}">${displayName}</div>
                     <div class="dice-result-name">${rollName}</div>
                     <div class="dice-result-calc">${rollCalc}</div>
                     <div class="dice-result-total ${critClass}">${result}</div>
@@ -4624,9 +4611,7 @@
                 mqttClient = null;
                 selectedCharIndices.clear();
                 isSelectingForMesa = false;
-                iamTheMestre = false;
-                mestreId = null;
-                resetMestrePanel();
+                resetMestrePanel(); // Limpa a lista de jogadores ao desconectar
                 updateOnlineButtonState();
                 renderCharacterGrid();
                 return;
@@ -4638,7 +4623,13 @@
             mesaCodigo = codigo;
             localStorage.setItem('dnd_mesa_codigo', codigo);
             
-            initMqtt(); // Conecta direto, sem seleção prévia
+            // Iniciar modo de seleção
+            isSelectingForMesa = true;
+            selectedCharIndices.clear();
+            document.getElementById('confirm-selection-btn').style.display = 'inline-block';
+            document.getElementById('online-btn').style.display = 'none';
+            renderCharacterGrid();
+            alert("Selecione os personagens que participarão desta mesa e clique em 'Confirmar Seleção'.");
         }
 
         function confirmSelection() {
@@ -4714,8 +4705,14 @@
                         const playerId = parts.pop();
                         handleRemoteCommand(playerId, data);
                     } else if (lastPart === 'rolls') {
-                        // Receber rolagem de dado
-                        showDiceAnimation(data.charName, data.rollName, data.rollCalc, data.result, data.natural);
+                        // Se for uma rolagem de mestre e eu NÃO sou o mestre, só mostro se for pública
+                        if (data.isMestre) {
+                            if (!iamTheMestre) {
+                                showDiceAnimation("Mestre", data.rollName, data.rollCalc, data.result, data.natural, true);
+                            }
+                        } else {
+                            showDiceAnimation(data.charName, data.rollName, data.rollCalc, data.result, data.natural);
+                        }
                         if (data.natural === 20) playSFX('success');
                         else if (data.natural === 1) playSFX('damage');
                     } else {
@@ -4882,10 +4879,16 @@
 
             list.innerHTML = '';
             
+            // Identificar meu ID de mestre para ocultar meu personagem
+            const myClientId = mqttClient ? mqttClient.options.clientId : null;
+
             const agora = Date.now();
             Object.values(jogadoresOnline).forEach(p => {
                 if (agora - (p.lastUpdate || 0) > 600000) return;
                 if (!iamTheMestre && p.hidden) return;
+
+                // Se eu sou o mestre, ocultar meu personagem do painel
+                if (iamTheMestre && p.clientId === myClientId) return;
 
                 const card = document.createElement('div');
                 card.className = 'mestre-card';
@@ -4974,12 +4977,6 @@
                 crownBtn.style.display = 'flex';
                 crownBtn.className = iamTheMestre ? 'crown-btn active' : 'crown-btn';
             }
-
-            // Mostrar/Esconder Janela de Dados do Mestre
-            const mestreDiceWin = document.getElementById('mestre-dice-window');
-            if (mestreDiceWin) {
-                mestreDiceWin.style.display = iamTheMestre ? 'block' : 'none';
-            }
         }
 
         function toggleExpandPlayer(playerId) {
@@ -5032,64 +5029,41 @@
             mqttClient.publish(`dnd/mesa/${mesaCodigo}/${playerId}`, JSON.stringify(p), { retain: true });
         }
 
+        let mestreRollPublic = false;
+
         function toggleIamMestre() {
             if (!mqttClient || !mqttClient.connected) return;
             
             const myId = mqttClient.options.clientId;
             
             if (!iamTheMestre) {
+                if (mestreId && mestreId !== myId) {
+                    alert("Já existe um mestre nesta mesa!");
+                    return;
+                }
+                
                 iamTheMestre = true;
                 mestreId = myId;
                 mqttClient.publish(`dnd/mesa/${mesaCodigo}/_mestre`, JSON.stringify({ id: myId }), { retain: true, qos: 1 });
-                document.getElementById('mestre-dice-window').style.display = 'block';
-                makeDraggable(document.getElementById('mestre-dice-window'), document.getElementById('mestre-dice-header'));
+                console.log("Agora você é o mestre.");
             } else {
                 iamTheMestre = false;
                 mestreId = null;
                 mqttClient.publish(`dnd/mesa/${mesaCodigo}/_mestre`, JSON.stringify({ id: null }), { retain: true, qos: 1 });
-                document.getElementById('mestre-dice-window').style.display = 'none';
+                console.log("Você não é mais o mestre.");
             }
+            
+            // Forçar sincronização para ocultar/mostrar meu personagem
+            syncPlayerData();
             renderMestrePanel();
         }
 
-        // Funções para o Hub de Rolagem do Mestre
-        function toggleRollsDropdownMestre(e) {
-            e.stopPropagation();
-            const dropdown = document.getElementById('rolls-dropdown-mestre');
-            if (dropdown.style.display === 'block') {
-                dropdown.style.display = 'none';
-            } else {
-                updateSavedRollsListMestre();
-                dropdown.style.display = 'block';
-            }
-        }
-
-        function updateSavedRollsListMestre() {
-            // Usa as rolagens do primeiro personagem local ou um objeto vazio
-            const char = allCharacters[0] || { customRolls: {} };
-            const dropdown = document.getElementById('rolls-dropdown-mestre');
-            if (!dropdown) return;
-            dropdown.innerHTML = '';
-            
-            if (char.customRolls && Object.keys(char.customRolls).length > 0) {
-                Object.entries(char.customRolls).forEach(([name, val]) => {
-                    const item = document.createElement('div');
-                    item.className = 'roll-item';
-                    item.onclick = (e) => {
-                        document.getElementById('mestre-roll-name').value = name;
-                        document.getElementById('mestre-roll-value').value = val;
-                        dropdown.style.display = 'none';
-                    };
-                    item.innerHTML = `
-                        <div class="roll-item-info">
-                            <span>${name}</span>
-                            <span class="roll-item-val">${val}</span>
-                        </div>
-                    `;
-                    dropdown.appendChild(item);
-                });
-            } else {
-                dropdown.innerHTML = '<div style="padding:10px; font-size:10px; color:#64748b; text-align:center;">Nenhuma rolagem salva.</div>';
+        function toggleMestreRollPublic() {
+            mestreRollPublic = !mestreRollPublic;
+            const btn = document.getElementById('mestre-roll-visibility-btn');
+            if (btn) {
+                btn.innerHTML = mestreRollPublic ? '👁️' : '👁️‍🗨️';
+                btn.title = mestreRollPublic ? 'Rolagem Pública' : 'Rolagem Privada';
             }
         }
 
@@ -5105,35 +5079,24 @@
             }
 
             const result = parseDice(val);
-            // Mostrar APENAS localmente para o mestre
-            showDiceAnimationMestre("Mestre 👑", name, val, result.total, result.natural);
-            playSFX('action');
-        }
+            const total = result.total;
+            const natural = result.natural;
 
-        function showDiceAnimationMestre(charName, rollName, rollCalc, result, natural) {
-            const panel = document.getElementById('mestre-panel');
-            if (panel) {
-                const old = panel.querySelector('.dice-result-popup');
-                if (old) old.remove();
-
-                const popup = document.createElement('div');
-                popup.className = 'dice-result-popup mestre-secret';
-                
-                let critClass = '';
-                if (rollCalc.toLowerCase().includes('1d20')) {
-                    if (natural === 20) critClass = 'crit-success';
-                    else if (natural === 1) critClass = 'crit-fail';
-                }
-
-                popup.innerHTML = `
-                    <div class="dice-result-char" style="color:#ffd700">${charName}</div>
-                    <div class="dice-result-name">${rollName}</div>
-                    <div class="dice-result-calc">${rollCalc}</div>
-                    <div class="dice-result-total ${critClass}">${result}</div>
-                `;
-                panel.appendChild(popup);
-                setTimeout(() => { if (popup.parentNode) popup.remove(); }, 5000);
+            if (mestreRollPublic && mqttClient && mqttClient.connected) {
+                mqttClient.publish(`dnd/mesa/${mesaCodigo}/rolls`, JSON.stringify({
+                    playerId: 'mestre',
+                    charName: 'Mestre',
+                    rollName: name,
+                    rollCalc: val,
+                    result: total,
+                    natural: natural,
+                    isMestre: true
+                }));
             }
+            
+            // Mostrar localmente para o mestre
+            showDiceAnimation("Mestre", name, val, total, natural, true);
+            playSFX('action');
         }
 
         // Heartbeat do mestre: se o mestre parar de enviar, a coroa cai
@@ -5626,6 +5589,16 @@
             <div id="mestre-list" style="display:flex; flex-direction:column; gap:10px; max-height:400px; overflow-y:auto;">
                 <div style="font-size:12px; color:#64748b; text-align:center;">Aguardando jogadores...</div>
             </div>
+            
+            <!-- Hub de Rolagem do Mestre (Rodapé) -->
+            <div id="mestre-footer-roll" style="display:none; margin-top:10px; border-top:1px solid var(--border-color); padding-top:10px;">
+                <div style="display:flex; gap:5px; align-items:center;">
+                    <input type="text" id="mestre-roll-name" placeholder="Nome" style="flex:1; font-size:10px; padding:4px;">
+                    <input type="text" id="mestre-roll-value" placeholder="1d20+2" style="width:60px; font-size:10px; padding:4px;">
+                    <button onclick="executeMestreRoll()" style="padding:4px 8px; font-size:10px;">🎲</button>
+                    <button id="mestre-roll-visibility-btn" onclick="toggleMestreRollPublic()" title="Rolagem Privada" style="padding:4px 8px; font-size:10px;">👁️‍🗨️</button>
+                </div>
+            </div>
         </div>
 
         <div id="mestre-bestiary-view" style="display:none;">
@@ -5640,25 +5613,6 @@
         </div>
     </div>
     
-    <!-- JANELA DE DADOS DO MESTRE (FLUTUANTE) -->
-    <div id="mestre-dice-window">
-        <div class="mestre-window-header" id="mestre-dice-header">
-            <strong style="color:#ffd700; font-size:12px;">🎲 Dados do Mestre 👑</strong>
-            <span style="cursor:pointer; font-size:16px;" onclick="document.getElementById('mestre-dice-window').style.display='none'">×</span>
-        </div>
-        <div class="custom-roll-hub" style="flex-direction: column; gap: 8px;">
-            <div class="roll-select-container" style="width: 100%;">
-                <input type="text" id="mestre-roll-name" class="roll-name-input" placeholder="Nome da Rolagem" onclick="toggleRollsDropdownMestre(event)" style="width: 100%;">
-                <div id="rolls-dropdown-mestre" class="rolls-dropdown"></div>
-            </div>
-            <div style="display: flex; gap: 5px; width: 100%;">
-                <input type="text" id="mestre-roll-value" class="roll-value-input" placeholder="Dado (ex: 1d20+5)" style="flex: 1;">
-                <button class="roll-btn-red" onclick="executeMestreRoll()" style="padding: 0 10px;">ROLAR</button>
-            </div>
-        </div>
-        <div style="font-size:9px; color:#64748b; margin-top:8px; text-align:center;">Resultados aparecem apenas para você.</div>
-    </div>
-
     <!-- MODAL DE EDITOR DE ITEM -->
     <div id="item-editor-modal" class="modal">
         <div class="modal-content">
