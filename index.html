@@ -4229,6 +4229,8 @@
         let expandedPlayers = new Set();
         let currentTargetPlayerId = null;
         let selectedConditionColor = '#ff4d4d';
+        let mestreMonsters = JSON.parse(localStorage.getItem('mestreMonsters') || '[]');
+        let expandedMonsters = new Set();
         
         const PALETTE_COLORS = [
             '#ff4d4d', '#4dff88', '#58a6ff', '#ffd700', '#bc8cf2',
@@ -4414,6 +4416,18 @@
             if (idx === -1) return;
             
             const char = allCharacters[idx];
+            if (cmd.type === 'whisper') {
+                // Mostrar overlay de sussurro na ficha do jogador
+                const overlay = document.getElementById('whisper-overlay');
+                const content = document.getElementById('whisper-content');
+                if (overlay && content) {
+                    content.textContent = cmd.message;
+                    overlay.style.display = 'flex';
+                    playSFX('whisper');
+                }
+                return;
+            }
+
             if (cmd.type === 'add_item') {
                 const newItem = {
                     id: Date.now() + Math.random(),
@@ -4550,8 +4564,12 @@
                             <button onclick="remoteHPAction('${p.id}', 'heal')" style="background:#4dff88; border-color:#4dff88; color:#0f172a;">Cura</button>
                             <button onclick="remoteHPAction('${p.id}', 'temp')" style="background:#58a6ff; border-color:#58a6ff; color:white;">Temp</button>
                         </div>
-                        <div style="border-top:1px solid rgba(255,255,255,0.05); padding-top:8px; margin-top:5px;">
+                        <div style="border-top:1px solid rgba(255,255,255,0.05); padding-top:8px; margin-top:5px; display:flex; flex-direction:column; gap:6px;">
                             <button onclick="openMasterItemHub('${p.id}')" style="font-size:10px; padding:4px; width:100%; border-color:var(--accent-color); color:var(--accent-color);">Adicionar Item</button>
+                            <div style="display:flex; gap:5px; align-items:center;">
+                                <input type="text" id="whisper-input-${p.id}" placeholder="Sussurrar algo..." onclick="event.stopPropagation()" style="flex:1; font-size:10px; padding:4px; background:rgba(188,140,242,0.1); border-color:#bc8cf2;">
+                                <button onclick="sendWhisperInline('${p.id}')" style="font-size:10px; padding:4px 8px; background:#bc8cf2; border-color:#bc8cf2; color:#0f172a; white-space:nowrap;">💬 Sussurar</button>
+                            </div>
                         </div>
                     </div>` : ''}
                 `;
@@ -4566,7 +4584,8 @@
             document.getElementById('mesa-display').innerText = mesaCodigo;
             
             const crownBtn = document.getElementById('mestre-crown-btn');
-            if (mestreId && mestreId !== mqttClient.options.clientId) {
+            const myClientId = mqttClient ? mqttClient.options.clientId : null;
+            if (mestreId && mestreId !== myClientId) {
                 crownBtn.style.display = 'none';
             } else {
                 crownBtn.style.display = 'flex';
@@ -4597,10 +4616,22 @@
         function applyCustomCondition() {
             const name = document.getElementById('custom-condition-name').value.trim();
             if (!name) {
-                alert("Digite o nome da condição!");
+                alert('Digite o nome da condição!');
                 return;
             }
-            setPlayerCondition(currentTargetPlayerId, name, selectedConditionColor);
+            // Verificar se é condição de monstro ou de jogador
+            if (currentTargetPlayerId && currentTargetPlayerId.startsWith('monster:')) {
+                const monsterId = currentTargetPlayerId.replace('monster:', '');
+                const m = mestreMonsters.find(x => x.id === monsterId);
+                if (m) {
+                    m.condition = name;
+                    m.conditionColor = selectedConditionColor;
+                    localStorage.setItem('mestreMonsters', JSON.stringify(mestreMonsters));
+                    renderBestiary();
+                }
+            } else {
+                setPlayerCondition(currentTargetPlayerId, name, selectedConditionColor);
+            }
             closeConditionModal();
         }
 
@@ -4775,6 +4806,30 @@
             });
         }
 
+        function sendWhisperInline(playerId) {
+            if (!mqttClient || !mqttClient.connected) {
+                alert('Você precisa estar conectado à mesa para sussurrar!');
+                return;
+            }
+            const input = document.getElementById(`whisper-input-${playerId}`);
+            const msg = input ? input.value.trim() : '';
+            if (!msg) {
+                alert('Escreva uma mensagem antes de sussurrar!');
+                return;
+            }
+            mqttClient.publish(`dnd/mesa/${mesaCodigo}/${playerId}/cmd`, JSON.stringify({
+                type: 'whisper',
+                message: msg
+            }), { qos: 1 }, (err) => {
+                if (err) {
+                    alert('Erro ao enviar o sussurro. Tente novamente.');
+                } else {
+                    if (input) input.value = '';
+                    playSFX('whisper');
+                }
+            });
+        }
+
         function remoteHPAction(playerId, type) {
             const input = document.getElementById(`hp-val-${playerId}`);
             const valStr = input.value.trim();
@@ -4831,20 +4886,43 @@
             document.getElementById('monster-class').value = '';
             document.getElementById('monster-hp-max').value = '';
             document.getElementById('monster-ac').value = '';
-            document.getElementById('monster-photo').value = '';
+            // Reset foto
+            const prevImg = document.getElementById('monster-photo-preview');
+            const prevPlaceholder = document.getElementById('monster-photo-placeholder');
+            if (prevImg) { prevImg.src = ''; prevImg.style.display = 'none'; }
+            if (prevPlaceholder) prevPlaceholder.style.display = 'flex';
+            // Limpar data-photo
+            document.getElementById('monster-modal').dataset.photo = '';
             playSFX('click');
         }
 
+        function handleMonsterPhotoUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = ev => {
+                const prevImg = document.getElementById('monster-photo-preview');
+                const prevPlaceholder = document.getElementById('monster-photo-placeholder');
+                prevImg.src = ev.target.result;
+                prevImg.style.display = 'block';
+                prevPlaceholder.style.display = 'none';
+                document.getElementById('monster-modal').dataset.photo = ev.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
         function saveMonster() {
+            const hpVal = parseInt(document.getElementById('monster-hp-max').value) || 10;
+            const photoData = document.getElementById('monster-modal').dataset.photo || '';
             const monster = {
                 id: 'm-' + Date.now(),
-                name: document.getElementById('monster-name').value || 'Monstro',
-                level: document.getElementById('monster-level').value || '1',
-                class: document.getElementById('monster-class').value || 'Inimigo',
-                hpMax: parseInt(document.getElementById('monster-hp-max').value) || 10,
-                hp: parseInt(document.getElementById('monster-hp-max').value) || 10,
+                name: document.getElementById('monster-name').value.trim() || 'Monstro',
+                level: document.getElementById('monster-level').value.trim() || '1',
+                class: document.getElementById('monster-class').value.trim() || 'Inimigo',
+                hpMax: hpVal,
+                hp: hpVal,
                 ac: parseInt(document.getElementById('monster-ac').value) || 10,
-                photo: document.getElementById('monster-photo').value || '',
+                photo: photoData,
                 tempHP: 0,
                 condition: 'Nenhuma',
                 conditionColor: ''
@@ -4858,70 +4936,130 @@
 
         function renderBestiary() {
             const list = document.getElementById('mestre-monster-list');
+            // Salvar inputs ativos
+            const savedInputs = {};
+            list.querySelectorAll('input').forEach(inp => { savedInputs[inp.id] = inp.value; });
             list.innerHTML = '';
             
             if (mestreMonsters.length === 0) {
-                list.innerHTML = '<div style="font-size:12px; color:#64748b; text-align:center;">Nenhum monstro salvo.</div>';
+                list.innerHTML = '<div style="font-size:12px; color:#64748b; text-align:center; padding:15px 0;">Nenhum monstro no bestiário.<br><small>Clique em "+ Adicionar Monstro"</small></div>';
                 return;
             }
 
             mestreMonsters.forEach((m, idx) => {
                 const isDead = m.hp <= 0;
-                const hpPercent = (m.hp / m.hpMax) * 100;
+                const hpPercent = Math.max(0, Math.min(100, (m.hp / m.hpMax) * 100));
                 let hpColor = hpPercent > 50 ? '#4dff88' : (hpPercent > 20 ? '#ffd700' : '#ff4d4d');
-                if (m.conditionColor) hpColor = m.conditionColor;
+                if (m.conditionColor && m.condition !== 'Nenhuma') hpColor = m.conditionColor;
+                const isExpanded = expandedMonsters.has(m.id);
+                const tempHPText = m.tempHP > 0 ? `<span style="color:#58a6ff"> (+${m.tempHP})</span>` : '';
 
                 const card = document.createElement('div');
                 card.className = 'mestre-card';
                 if (isDead) {
                     card.style.filter = 'grayscale(100%)';
                     card.style.opacity = '0.8';
+                    card.style.background = 'rgba(0,0,0,0.4)';
                 }
 
+                const svgPlaceholder = `data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%23334155%22/><text x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22white%22 font-size=%2240%22>👹</text></svg>`;
+
                 card.innerHTML = `
-                    <div class="mestre-card-main">
+                    <div class="mestre-card-main" onclick="toggleExpandMonster('${m.id}')" style="cursor:pointer;">
                         <div class="mestre-card-photo-container">
-                            <img src="${m.photo}" class="mestre-card-photo" style="border-color:${isDead ? '#64748b' : hpColor}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%23334155%22/><text x=%2250%%22 y=%2250%%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22white%22 font-size=%2240%22>?</text></svg>'">
-                            <div class="visibility-toggle" onclick="deleteMonster('${m.id}')" style="background:#ef4444; border-radius:50%; width:16px; height:16px; display:flex; align-items:center; justify-content:center; font-size:10px; position:absolute; top:-5px; right:-5px; cursor:pointer;">×</div>
+                            <img src="${m.photo || svgPlaceholder}" class="mestre-card-photo" style="border-color:${isDead ? '#64748b' : hpColor}" onerror="this.src='${svgPlaceholder}'">
+                            <div style="position:absolute; top:-5px; right:-5px; background:#ef4444; border-radius:50%; width:16px; height:16px; display:flex; align-items:center; justify-content:center; font-size:10px; cursor:pointer; z-index:5;" onclick="event.stopPropagation(); deleteMonster('${m.id}')">×</div>
+                            ${isDead ? '<div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:20px; text-shadow:0 0 8px black; z-index:5;">💀</div>' : ''}
                         </div>
-                        <div style="flex:1">
-                            <div style="font-weight:bold; color:${isDead ? '#94a3b8' : hpColor}; font-size:13px;">
-                                ${m.name} <small style="color:#64748b;">CR ${m.level}</small>
+                        <div style="flex:1; min-width:0;">
+                            <div style="font-weight:bold; color:${isDead ? '#94a3b8' : hpColor}; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                ${m.name} <small style="color:#64748b; font-weight:normal;">CR ${m.level} ${m.class}</small>
                             </div>
-                            <div style="display:flex; justify-content:space-between; margin-top:3px; font-size:11px;">
-                                <span>HP: ${m.hp}/${m.hpMax}</span>
-                                <span>🛡️ ${m.ac}</span>
+                            <div style="display:flex; justify-content:space-between; margin-top:3px; font-size:11px; color:#94a3b8;">
+                                <span>HP: ${m.hp}/${m.hpMax}${tempHPText}</span>
+                                <div style="display:flex; align-items:center; gap:5px;">
+                                    ${m.condition && m.condition !== 'Nenhuma' ? `<span class="condition-badge" style="background:${hpColor}">${m.condition}</span>` : ''}
+                                    <span>🛡️ ${m.ac}</span>
+                                </div>
                             </div>
-                            <div style="width:100%; height:5px; background:#334155; border-radius:3px; margin-top:4px; overflow:hidden;">
-                                <div style="width:${Math.max(0, Math.min(100, hpPercent))}%; height:100%; background:${isDead ? '#475569' : hpColor};"></div>
+                            <div style="width:100%; height:5px; background:#334155; border-radius:3px; margin-top:4px; overflow:hidden; position:relative;">
+                                <div style="width:${hpPercent}%; height:100%; background:${isDead ? '#475569' : hpColor}; transition:width 0.3s;"></div>
+                                ${m.tempHP > 0 ? `<div style="position:absolute; top:0; left:0; width:${Math.min(100, (m.tempHP/m.hpMax)*100)}%; height:100%; background:rgba(88,166,255,0.5); border-right:1px solid #58a6ff;"></div>` : ''}
                             </div>
-                        </div>
-                    </div>
-                    <div class="mestre-hp-hub" style="margin-top:5px; padding:5px; background:rgba(0,0,0,0.2); border-radius:5px;">
-                        <div style="display:flex; gap:5px; margin-bottom:5px;">
-                            <input type="text" id="monster-hp-val-${m.id}" placeholder="Dano/Cura" style="font-size:9px; padding:2px;">
-                            <button onclick="monsterHPAction('${m.id}', 'damage')" style="padding:2px 5px; font-size:9px; background:#ff4d4d; border-color:#ff4d4d; color:white;">-</button>
-                            <button onclick="monsterHPAction('${m.id}', 'heal')" style="padding:2px 5px; font-size:9px; background:#4dff88; border-color:#4dff88; color:#0f172a;">+</button>
                         </div>
                     </div>
+                    ${isExpanded ? `
+                    <div class="mestre-hp-hub">
+                        <div style="display:flex; gap:5px; align-items:center;">
+                            <button onclick="promptMonsterCondition('${m.id}')" style="font-size:9px; padding:2px 5px; flex:1;">➕ Condição</button>
+                            <button onclick="clearMonsterCondition('${m.id}')" style="font-size:9px; padding:2px 5px; background:#475569; border-color:#475569;">Limpar</button>
+                        </div>
+                        <div class="mestre-hp-controls">
+                            <input type="text" id="monster-hp-val-${m.id}" placeholder="1d6+2" onclick="event.stopPropagation()">
+                            <button onclick="monsterHPAction('${m.id}', 'damage')" style="background:#ff4d4d; border-color:#ff4d4d; color:white;">Dano</button>
+                            <button onclick="monsterHPAction('${m.id}', 'heal')" style="background:#4dff88; border-color:#4dff88; color:#0f172a;">Cura</button>
+                            <button onclick="monsterHPAction('${m.id}', 'temp')" style="background:#58a6ff; border-color:#58a6ff; color:white;">Temp</button>
+                        </div>
+                    </div>` : ''}
                 `;
                 list.appendChild(card);
+
+                // Restaurar input ativo
+                const inp = document.getElementById(`monster-hp-val-${m.id}`);
+                if (inp && savedInputs[inp.id] !== undefined && document.activeElement === inp) {
+                    inp.value = savedInputs[inp.id];
+                }
             });
+        }
+
+        function toggleExpandMonster(id) {
+            if (expandedMonsters.has(id)) expandedMonsters.delete(id);
+            else expandedMonsters.add(id);
+            renderBestiary();
+            playSFX('click');
+        }
+
+        function promptMonsterCondition(monsterId) {
+            currentTargetPlayerId = 'monster:' + monsterId;
+            document.getElementById('condition-modal').style.display = 'flex';
+            document.getElementById('custom-condition-name').value = '';
+            initPsPicker('ps-picker-condition', selectedConditionColor, (hex) => {
+                selectedConditionColor = hex;
+            });
+        }
+
+        function clearMonsterCondition(monsterId) {
+            const m = mestreMonsters.find(x => x.id === monsterId);
+            if (!m) return;
+            m.condition = 'Nenhuma';
+            m.conditionColor = '';
+            localStorage.setItem('mestreMonsters', JSON.stringify(mestreMonsters));
+            renderBestiary();
         }
 
         function monsterHPAction(id, type) {
             const m = mestreMonsters.find(x => x.id === id);
             if (!m) return;
             const input = document.getElementById(`monster-hp-val-${id}`);
-            const val = parseInt(input.value) || 0;
+            const valStr = input ? input.value.trim() : '';
+            if (!valStr) return;
+            const val = parseDice(valStr);
             if (type === 'damage') {
-                m.hp = Math.max(0, m.hp - val);
+                let dmg = val;
+                if (m.tempHP > 0) {
+                    if (dmg <= m.tempHP) { m.tempHP -= dmg; dmg = 0; }
+                    else { dmg -= m.tempHP; m.tempHP = 0; }
+                }
+                m.hp = Math.max(0, m.hp - dmg);
                 playSFX('damage');
-            } else {
+            } else if (type === 'heal') {
                 m.hp = Math.min(m.hpMax, m.hp + val);
                 playSFX('heal');
+            } else if (type === 'temp') {
+                m.tempHP = val;
+                playSFX('heal');
             }
-            input.value = '';
+            if (input) input.value = '';
             localStorage.setItem('mestreMonsters', JSON.stringify(mestreMonsters));
             renderBestiary();
         }
@@ -5068,20 +5206,7 @@
         </div>
     </div>
 
-    <!-- MODAL DE SUSSURRO -->
-    <div id="whisper-modal" class="modal">
-        <div class="modal-content" style="max-width:400px;">
-            <div class="modal-title">💬 Enviar Sussurro</div>
-            <div class="form-group">
-                <label>Mensagem Privada</label>
-                <textarea id="whisper-message" rows="3" placeholder="Escreva algo importante apenas para este jogador..."></textarea>
-            </div>
-            <div style="display:flex; gap:10px; margin-top:20px;">
-                <button onclick="sendWhisper()" style="flex:1; background:var(--accent-color); color:var(--bg-color);">Enviar Sussurro</button>
-                <button onclick="document.getElementById('whisper-modal').style.display='none'" style="flex:1; border-color:#64748b; color:#64748b;">Cancelar</button>
-            </div>
-        </div>
-    </div>
+    <!-- Modal de sussurro removido - agora é inline no hub do mestre -->
 
     <!-- NOTIFICAÇÃO DE SUSSURRO RECEBIDO -->
     <div id="whisper-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:10000; justify-content:center; align-items:center; backdrop-filter:blur(10px);">
@@ -5121,6 +5246,56 @@
             <div style="display:flex; gap:10px; margin-top:20px;">
                 <button onclick="closeMasterItemModal()" style="flex:1; border-color:#475569; color:#94a3b8;">Cancelar</button>
                 <button onclick="sendMasterItem()" style="flex:1;">Adicionar Item</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE ADICIONAR MONSTRO -->
+    <div id="monster-modal" class="modal">
+        <div class="modal-content" style="max-width:420px;">
+            <h3 class="modal-title">🐉 Adicionar ao Bestiário</h3>
+            <div style="display:flex; gap:15px; margin-bottom:15px;">
+                <!-- Foto do monstro -->
+                <div style="flex-shrink:0; display:flex; flex-direction:column; align-items:center; gap:6px;">
+                    <div class="item-photo-box" style="width:90px; height:90px; cursor:pointer; border-color:#bc8cf2;" onclick="document.getElementById('monster-photo-input').click()">
+                        <img id="monster-photo-preview" style="display:none; width:100%; height:100%; object-fit:cover;">
+                        <div id="monster-photo-placeholder" style="display:flex; flex-direction:column; align-items:center; gap:4px; color:#64748b;">
+                            <span style="font-size:28px;">🐉</span>
+                            <span style="font-size:9px;">Foto</span>
+                        </div>
+                    </div>
+                    <input type="file" id="monster-photo-input" style="display:none;" accept="image/*" onchange="handleMonsterPhotoUpload(event)">
+                    <span style="font-size:9px; color:#64748b;">Clique para foto</span>
+                </div>
+                <!-- Campos do monstro -->
+                <div style="flex:1; display:flex; flex-direction:column; gap:10px;">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label>Nome</label>
+                        <input type="text" id="monster-name" placeholder="Ex: Goblin Arqueiro">
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>CR / Nível</label>
+                            <input type="text" id="monster-level" placeholder="Ex: 1/2">
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>Tipo / Classe</label>
+                            <input type="text" id="monster-class" placeholder="Ex: Humanoide">
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>HP Máximo</label>
+                            <input type="number" id="monster-hp-max" placeholder="Ex: 30" min="1">
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>CA (Armadura)</label>
+                            <input type="number" id="monster-ac" placeholder="Ex: 13" min="0">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div style="display:flex; gap:10px; margin-top:5px;">
+                <button onclick="document.getElementById('monster-modal').style.display='none'" style="flex:1; border-color:#475569; color:#94a3b8;">Cancelar</button>
+                <button onclick="saveMonster()" style="flex:1; background:#bc8cf2; border-color:#bc8cf2; color:#0f172a;">Adicionar Monstro</button>
             </div>
         </div>
     </div>
