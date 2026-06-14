@@ -892,6 +892,127 @@
             font-weight: 800;
         }
 
+        /* Hub de Rolagem Personalizada */
+        .custom-roll-hub {
+            display: flex;
+            gap: 8px;
+            margin-top: 15px;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            align-items: center;
+        }
+
+        .roll-select-container {
+            position: relative;
+            flex: 2;
+        }
+
+        .roll-name-input {
+            width: 100%;
+            background: #065f46 !important; /* Verde escuro estilo Photoshop */
+            color: white !important;
+            border: 1px solid #059669 !important;
+            padding: 8px !important;
+            font-size: 13px !important;
+            border-radius: 4px !important;
+        }
+
+        .roll-value-input {
+            flex: 1;
+            background: #1e40af !important; /* Azul escuro estilo Photoshop */
+            color: white !important;
+            border: 1px solid #3b82f6 !important;
+            padding: 8px !important;
+            font-size: 13px !important;
+            border-radius: 4px !important;
+            text-align: center;
+        }
+
+        .roll-btn-red {
+            background: #991b1b !important; /* Vermelho escuro estilo Photoshop */
+            color: white !important;
+            border: 1px solid #ef4444 !important;
+            padding: 8px 15px !important;
+            font-weight: bold !important;
+            cursor: pointer;
+            border-radius: 4px !important;
+            transition: all 0.2s;
+        }
+
+        .roll-btn-red:hover {
+            background: #b91c1c !important;
+            transform: scale(1.05);
+        }
+
+        /* Animação de Resultado de Dado */
+        .dice-result-popup {
+            position: absolute;
+            left: 105%;
+            top: 50%;
+            transform: translateY(-50%);
+            background: var(--card-bg);
+            border: 2px solid var(--accent-color);
+            padding: 10px 15px;
+            border-radius: 12px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.8);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 120px;
+            animation: dicePopIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards,
+                       diceFadeOut 0.5s ease 4.5s forwards;
+            pointer-events: none;
+        }
+
+        @keyframes dicePopIn {
+            0% { opacity: 0; transform: translateY(-50%) scale(0.5) rotate(-10deg); }
+            100% { opacity: 1; transform: translateY(-50%) scale(1) rotate(0deg); }
+        }
+
+        @keyframes diceFadeOut {
+            0% { opacity: 1; }
+            100% { opacity: 0; transform: translateY(-70%) scale(0.8); }
+        }
+
+        .dice-result-name {
+            font-size: 10px;
+            text-transform: uppercase;
+            color: #94a3b8;
+            margin-bottom: 2px;
+        }
+
+        .dice-result-calc {
+            font-size: 11px;
+            color: #64748b;
+            margin-bottom: 5px;
+        }
+
+        .dice-result-total {
+            font-size: 28px;
+            font-weight: 900;
+            color: white;
+            text-shadow: 0 0 10px var(--accent-color);
+        }
+
+        .dice-result-total.crit-success {
+            color: #4dff88;
+            text-shadow: 0 0 15px #4dff88;
+            animation: diceCrit 0.5s ease infinite alternate;
+        }
+
+        .dice-result-total.crit-fail {
+            color: #ff4d4d;
+            text-shadow: 0 0 15px #ff4d4d;
+        }
+
+        @keyframes diceCrit {
+            from { transform: scale(1); }
+            to { transform: scale(1.2); }
+        }
+
         /* Perícias - CORRIGIDO */
         .skills-wrapper {
             flex: 1;
@@ -1429,6 +1550,16 @@
                                 <span class="ficha-detail-label">⚖️ Tendência</span>
                                 <input type="text" id="charAlignment" placeholder="Tendência">
                             </div>
+                        </div>
+                        
+                        <!-- Hub de Rolagem Personalizada -->
+                        <div class="custom-roll-hub">
+                            <div class="roll-select-container">
+                                <input type="text" id="roll-name" class="roll-name-input" placeholder="Nome (ex: Iniciativa)" list="saved-rolls-list" onchange="loadSavedRollValue()">
+                                <datalist id="saved-rolls-list"></datalist>
+                            </div>
+                            <input type="text" id="roll-value" class="roll-value-input" placeholder="1d20+2">
+                            <button class="roll-btn-red" onclick="executeCustomRoll()">ROLAR</button>
                         </div>
                     </div>
                 </div>
@@ -2927,6 +3058,7 @@
             if (char.speed === undefined) char.speed = char.velocidade || 30;
             if (char.proficiencyBonus === undefined) char.proficiencyBonus = char.proficiency || char.prof || 2;
             if (char.inspiration === undefined) char.inspiration = 0;
+            if (!char.customRolls) char.customRolls = {};
 
             // Inventário (Nova estrutura de lista)
             if (!char.items || !Array.isArray(char.items)) {
@@ -3152,6 +3284,7 @@
             renderDeathSaves();
             renderGrimorio();
             renderEquipment();
+            updateSavedRollsList();
             // Whiteboard já será inicializado quando a aba for clicada
         }
 
@@ -3489,6 +3622,107 @@
         function toggleSkill(i) {
             allCharacters[currentCharacterIndex].skills[i].proficiency = !allCharacters[currentCharacterIndex].skills[i].proficiency;
             renderSkills(); saveAll();
+        }
+
+        // ===== ROLAGENS PERSONALIZADAS =====
+        function updateSavedRollsList() {
+            const char = allCharacters[currentCharacterIndex];
+            const list = document.getElementById('saved-rolls-list');
+            if (!list) return;
+            list.innerHTML = '';
+            if (char.customRolls) {
+                Object.keys(char.customRolls).forEach(name => {
+                    const opt = document.createElement('option');
+                    opt.value = name;
+                    list.appendChild(opt);
+                });
+            }
+        }
+
+        function loadSavedRollValue() {
+            const char = allCharacters[currentCharacterIndex];
+            const nameInput = document.getElementById('roll-name');
+            const valInput = document.getElementById('roll-value');
+            const name = nameInput.value.trim();
+            if (char.customRolls && char.customRolls[name]) {
+                valInput.value = char.customRolls[name];
+            }
+        }
+
+        function executeCustomRoll() {
+            const char = allCharacters[currentCharacterIndex];
+            const nameInput = document.getElementById('roll-name');
+            const valInput = document.getElementById('roll-value');
+            const name = nameInput.value.trim() || "Rolagem";
+            const val = valInput.value.trim();
+
+            if (!val) {
+                alert("Digite um valor de dado (ex: 1d20+2)");
+                return;
+            }
+
+            // Salvar no localStorage
+            if (!char.customRolls) char.customRolls = {};
+            char.customRolls[name] = val;
+            saveAll();
+            updateSavedRollsList();
+
+            // Executar rolagem
+            const result = parseDice(val);
+            const total = result.total;
+            const natural = result.natural;
+
+            if (mqttClient && mqttClient.connected) {
+                const safeId = btoa(unescape(encodeURIComponent(char.name))).replace(/[/+=]/g, '');
+                mqttClient.publish(`dnd/mesa/${mesaCodigo}/rolls`, JSON.stringify({
+                    playerId: safeId,
+                    charName: char.name,
+                    rollName: name,
+                    rollCalc: val,
+                    result: total,
+                    natural: natural
+                }));
+            }
+            
+            // Mostrar localmente também
+            showDiceAnimation(char.name, name, val, total, natural);
+            playSFX('action');
+        }
+
+        function showDiceAnimation(charName, rollName, rollCalc, result, natural) {
+            const safeId = btoa(unescape(encodeURIComponent(charName))).replace(/[/+=]/g, '');
+            // Procurar no painel do mestre OU se for o próprio personagem local
+            let card = document.querySelector(`[data-player-id="${safeId}"]`);
+            
+            // Se não achou no painel do mestre, talvez seja a própria ficha do jogador
+            if (!card && currentCharacterIndex !== -1) {
+                const char = allCharacters[currentCharacterIndex];
+                if (char && char.name === charName) {
+                    card = document.getElementById('fichaHeader'); // Animação no cabeçalho da ficha
+                }
+            }
+            
+            if (card) {
+                const old = card.querySelector('.dice-result-popup');
+                if (old) old.remove();
+
+                const popup = document.createElement('div');
+                popup.className = 'dice-result-popup';
+                
+                let critClass = '';
+                if (rollCalc.toLowerCase().includes('1d20')) {
+                    if (natural === 20) critClass = 'crit-success';
+                    else if (natural === 1) critClass = 'crit-fail';
+                }
+
+                popup.innerHTML = `
+                    <div class="dice-result-name">${rollName}</div>
+                    <div class="dice-result-calc">${rollCalc}</div>
+                    <div class="dice-result-total ${critClass}">${result}</div>
+                `;
+                card.appendChild(popup);
+                setTimeout(() => { if (popup.parentNode) popup.remove(); }, 5000);
+            }
         }
 
         function updateSkillMod(i, v) {
@@ -4337,6 +4571,11 @@
                         // Receber comando do mestre
                         const playerId = parts.pop();
                         handleRemoteCommand(playerId, data);
+                    } else if (lastPart === 'rolls') {
+                        // Receber rolagem de dado
+                        showDiceAnimation(data.charName, data.rollName, data.rollCalc, data.result, data.natural);
+                        if (data.natural === 20) playSFX('success');
+                        else if (data.natural === 1) playSFX('damage');
                     } else {
                         const playerId = lastPart;
                         data.id = playerId;
@@ -4403,6 +4642,7 @@
                     mqttClient.publish(`dnd/mesa/${mesaCodigo}/${safeId}`, JSON.stringify(data), { retain: true, qos: 0 });
                     mqttClient.subscribe(`dnd/mesa/${mesaCodigo}/${safeId}/cmd`);
                 });
+                mqttClient.subscribe(`dnd/mesa/${mesaCodigo}/rolls`);
             }, 100); // Delay de 100ms para agrupar mudanças rápidas
         }
 
@@ -4507,6 +4747,7 @@
 
                 const card = document.createElement('div');
                 card.className = 'mestre-card';
+                card.setAttribute('data-player-id', p.id);
                 if (p.hidden) card.style.opacity = '0.6';
                 if (iamTheMestre) card.style.cursor = 'pointer';
                 
@@ -4702,10 +4943,9 @@
 
         function parseDice(str) {
             str = str.toLowerCase().replace(/\s/g, '');
-            if (!str.includes('d')) return parseInt(str) || 0;
-            
             const parts = str.split(/([+-])/);
             let total = 0;
+            let natural = null;
             let currentOp = '+';
             
             for (let part of parts) {
@@ -4716,9 +4956,13 @@
                 
                 let val = 0;
                 if (part.includes('d')) {
-                    const [num, sides] = part.split('d').map(n => parseInt(n) || 1);
+                    const [numStr, sidesStr] = part.split('d');
+                    const num = parseInt(numStr) || 1;
+                    const sides = parseInt(sidesStr) || 20;
                     for (let i = 0; i < num; i++) {
-                        val += Math.floor(Math.random() * sides) + 1;
+                        const roll = Math.floor(Math.random() * sides) + 1;
+                        if (natural === null) natural = roll;
+                        val += roll;
                     }
                 } else {
                     val = parseInt(part) || 0;
@@ -4727,7 +4971,7 @@
                 if (currentOp === '+') total += val;
                 else total -= val;
             }
-            return total;
+            return { total, natural };
         }
 
         function openMasterItemHub(playerId) {
