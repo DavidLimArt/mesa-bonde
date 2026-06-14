@@ -1045,6 +1045,13 @@
             letter-spacing: 1px;
         }
 
+        /* Pop-up do Mestre (Esquerda) */
+        .dice-result-popup.mestre-secret {
+            left: auto;
+            right: 105%;
+            border-color: #ffd700; /* Dourado */
+        }
+
         .dice-result-name {
             font-size: 10px;
             text-transform: uppercase;
@@ -1617,10 +1624,10 @@
                             <div class="ficha-detail-item">
                                 <span class="ficha-detail-label">⚖️ Tendência</span>
                                 <div style="display:flex; gap:10px; align-items:center;">
-                                    <input type="text" id="charAlignment" placeholder="Tendência" style="flex:1;">
+                                    <input type="text" id="charAlignment" placeholder="Tendência" style="flex:1.8;">
                                     
                                     <!-- Hub de Rolagem Compacto -->
-                                    <div class="custom-roll-hub" style="flex:1.5;">
+                                    <div class="custom-roll-hub" style="flex:1.2;">
                                         <div class="roll-select-container">
                                             <input type="text" id="roll-name" class="roll-name-input" placeholder="Rolagem" onclick="toggleRollsDropdown(event)">
                                             <div id="rolls-dropdown" class="rolls-dropdown"></div>
@@ -4600,14 +4607,28 @@
             
             mesaCodigo = codigo;
             localStorage.setItem('dnd_mesa_codigo', codigo);
+
+            // Perguntar se quer ser Mestre ou Jogador
+            const role = confirm("Deseja entrar como MESTRE?\n\nOK = Mestre (Controle total, sem personagem)\nCancelar = Jogador (Escolher personagem)");
             
-            // Iniciar modo de seleção
-            isSelectingForMesa = true;
-            selectedCharIndices.clear();
-            document.getElementById('confirm-selection-btn').style.display = 'inline-block';
-            document.getElementById('online-btn').style.display = 'none';
-            renderCharacterGrid();
-            alert("Selecione os personagens que participarão desta mesa e clique em 'Confirmar Seleção'.");
+            if (role) {
+                // Modo Mestre Direto
+                isSelectingForMesa = false;
+                selectedCharIndices.clear();
+                initMqtt();
+                // A coroa será assumida no on('connect') ou via toggleIamMestre
+                setTimeout(() => {
+                    if (!iamTheMestre) toggleIamMestre();
+                }, 1000);
+            } else {
+                // Modo Jogador: Iniciar modo de seleção
+                isSelectingForMesa = true;
+                selectedCharIndices.clear();
+                document.getElementById('confirm-selection-btn').style.display = 'inline-block';
+                document.getElementById('online-btn').style.display = 'none';
+                renderCharacterGrid();
+                alert("Selecione os personagens que participarão desta mesa e clique em 'Confirmar Seleção'.");
+            }
         }
 
         function confirmSelection() {
@@ -4943,6 +4964,12 @@
                 crownBtn.style.display = 'flex';
                 crownBtn.className = iamTheMestre ? 'crown-btn active' : 'crown-btn';
             }
+
+            // Mostrar/Esconder Hub de Rolagem do Mestre
+            const mestreHub = document.getElementById('mestre-secret-roll-hub');
+            if (mestreHub) {
+                mestreHub.style.display = iamTheMestre ? 'block' : 'none';
+            }
         }
 
         function toggleExpandPlayer(playerId) {
@@ -5001,29 +5028,104 @@
             const myId = mqttClient.options.clientId;
             
             if (!iamTheMestre) {
-                // Tentar assumir o papel de mestre
-                if (mestreId && mestreId !== myId) {
-                    alert("Já existe um mestre nesta mesa!");
-                    return;
-                }
-                
+                // Ao assumir, publicamos com RETAIN. Isso automaticamente derruba qualquer mestre anterior
+                // que esteja ouvindo o tópico, pois mestreId será atualizado para todos.
                 iamTheMestre = true;
                 mestreId = myId;
                 
-                // Publicar que eu sou o mestre com RETAIN
                 mqttClient.publish(`dnd/mesa/${mesaCodigo}/_mestre`, JSON.stringify({ id: myId }), { retain: true, qos: 1 });
-                
-                // Configurar um aviso de saída (Will) não é possível dinamicamente no MQTT.js sem reconectar.
-                // Então vamos usar o evento 'unload' e uma estratégia de "batida de coração" (heartbeat) curta.
                 console.log("Agora você é o mestre.");
             } else {
-                // Abdicar
                 iamTheMestre = false;
                 mestreId = null;
                 mqttClient.publish(`dnd/mesa/${mesaCodigo}/_mestre`, JSON.stringify({ id: null }), { retain: true, qos: 1 });
                 console.log("Você não é mais o mestre.");
             }
             renderMestrePanel();
+        }
+
+        // Funções para o Hub de Rolagem do Mestre
+        function toggleRollsDropdownMestre(e) {
+            e.stopPropagation();
+            const dropdown = document.getElementById('rolls-dropdown-mestre');
+            if (dropdown.style.display === 'block') {
+                dropdown.style.display = 'none';
+            } else {
+                updateSavedRollsListMestre();
+                dropdown.style.display = 'block';
+            }
+        }
+
+        function updateSavedRollsListMestre() {
+            // Usa as rolagens do primeiro personagem local ou um objeto vazio
+            const char = allCharacters[0] || { customRolls: {} };
+            const dropdown = document.getElementById('rolls-dropdown-mestre');
+            if (!dropdown) return;
+            dropdown.innerHTML = '';
+            
+            if (char.customRolls && Object.keys(char.customRolls).length > 0) {
+                Object.entries(char.customRolls).forEach(([name, val]) => {
+                    const item = document.createElement('div');
+                    item.className = 'roll-item';
+                    item.onclick = (e) => {
+                        document.getElementById('mestre-roll-name').value = name;
+                        document.getElementById('mestre-roll-value').value = val;
+                        dropdown.style.display = 'none';
+                    };
+                    item.innerHTML = `
+                        <div class="roll-item-info">
+                            <span>${name}</span>
+                            <span class="roll-item-val">${val}</span>
+                        </div>
+                    `;
+                    dropdown.appendChild(item);
+                });
+            } else {
+                dropdown.innerHTML = '<div style="padding:10px; font-size:10px; color:#64748b; text-align:center;">Nenhuma rolagem salva.</div>';
+            }
+        }
+
+        function executeMestreRoll() {
+            const nameInput = document.getElementById('mestre-roll-name');
+            const valInput = document.getElementById('mestre-roll-value');
+            const name = nameInput.value.trim() || "Rolagem";
+            const val = valInput.value.trim();
+
+            if (!val) {
+                alert("Digite um valor de dado (ex: 1d20+2)");
+                return;
+            }
+
+            const result = parseDice(val);
+            // Mostrar APENAS localmente para o mestre
+            showDiceAnimationMestre("Mestre 👑", name, val, result.total, result.natural);
+            playSFX('action');
+        }
+
+        function showDiceAnimationMestre(charName, rollName, rollCalc, result, natural) {
+            const panel = document.getElementById('mestre-panel');
+            if (panel) {
+                const old = panel.querySelector('.dice-result-popup');
+                if (old) old.remove();
+
+                const popup = document.createElement('div');
+                popup.className = 'dice-result-popup mestre-secret';
+                
+                let critClass = '';
+                if (rollCalc.toLowerCase().includes('1d20')) {
+                    if (natural === 20) critClass = 'crit-success';
+                    else if (natural === 1) critClass = 'crit-fail';
+                }
+
+                popup.innerHTML = `
+                    <div class="dice-result-char" style="color:#ffd700">${charName}</div>
+                    <div class="dice-result-name">${rollName}</div>
+                    <div class="dice-result-calc">${rollCalc}</div>
+                    <div class="dice-result-total ${critClass}">${result}</div>
+                `;
+                panel.appendChild(popup);
+                setTimeout(() => { if (popup.parentNode) popup.remove(); }, 5000);
+            }
         }
 
         // Heartbeat do mestre: se o mestre parar de enviar, a coroa cai
