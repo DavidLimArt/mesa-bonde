@@ -1623,18 +1623,18 @@
                             </div>
                             <div class="ficha-detail-item">
                                 <span class="ficha-detail-label">⚖️ Tendência</span>
-                                <div style="display:flex; gap:10px; align-items:center;">
-                                    <input type="text" id="charAlignment" placeholder="Tendência" style="flex:1.8;">
-                                    
-                                    <!-- Hub de Rolagem Compacto -->
-                                    <div class="custom-roll-hub" style="flex:1.2;">
-                                        <div class="roll-select-container">
-                                            <input type="text" id="roll-name" class="roll-name-input" placeholder="Rolagem" onclick="toggleRollsDropdown(event)">
-                                            <div id="rolls-dropdown" class="rolls-dropdown"></div>
-                                        </div>
-                                        <input type="text" id="roll-value" class="roll-value-input" placeholder="Dado">
-                                        <button class="roll-btn-red" onclick="executeCustomRoll()">🎲</button>
+                                <input type="text" id="charAlignment" placeholder="Tendência">
+                            </div>
+                            <div class="ficha-detail-item">
+                                <span class="ficha-detail-label">🎲 Rolagem</span>
+                                <!-- Hub de Rolagem Compacto -->
+                                <div class="custom-roll-hub" style="width:100%;">
+                                    <div class="roll-select-container">
+                                        <input type="text" id="roll-name" class="roll-name-input" placeholder="Rolagem" onclick="toggleRollsDropdown(event)">
+                                        <div id="rolls-dropdown" class="rolls-dropdown"></div>
                                     </div>
+                                    <input type="text" id="roll-value" class="roll-value-input" placeholder="Dado">
+                                    <button class="roll-btn-red" onclick="executeCustomRoll()">🎲</button>
                                 </div>
                             </div>
                         </div>
@@ -4596,6 +4596,8 @@
                 mqttClient = null;
                 selectedCharIndices.clear();
                 isSelectingForMesa = false;
+                iamTheMestre = false;
+                mestreId = null;
                 resetMestrePanel(); // Limpa a lista de jogadores ao desconectar
                 updateOnlineButtonState();
                 renderCharacterGrid();
@@ -4615,11 +4617,15 @@
                 // Modo Mestre Direto
                 isSelectingForMesa = false;
                 selectedCharIndices.clear();
-                initMqtt();
-                // A coroa será assumida no on('connect') ou via toggleIamMestre
+                initMqtt(); // Conecta ao MQTT
+                
+                // Forçar a ativação do painel e da coroa após a conexão
                 setTimeout(() => {
-                    if (!iamTheMestre) toggleIamMestre();
-                }, 1000);
+                    if (mqttClient && mqttClient.connected) {
+                        if (!iamTheMestre) toggleIamMestre();
+                        document.getElementById('mestre-panel').style.display = 'block';
+                    }
+                }, 1500);
             } else {
                 // Modo Jogador: Iniciar modo de seleção
                 isSelectingForMesa = true;
@@ -5617,6 +5623,19 @@
         <div id="mestre-players-view">
             <div id="mestre-list" style="display:flex; flex-direction:column; gap:10px; max-height:400px; overflow-y:auto;">
                 <div style="font-size:12px; color:#64748b; text-align:center;">Aguardando jogadores...</div>
+            </div>
+            
+            <!-- Hub de Rolagem Secreto do Mestre (Rodapé) -->
+            <div id="mestre-secret-roll-hub" style="display:none; margin-top:15px; border-top:1px solid var(--border-color); padding-top:10px;">
+                <div class="custom-roll-hub">
+                    <div class="roll-select-container">
+                        <input type="text" id="mestre-roll-name" class="roll-name-input" placeholder="Rolagem" onclick="toggleRollsDropdownMestre(event)">
+                        <div id="rolls-dropdown-mestre" class="rolls-dropdown"></div>
+                    </div>
+                    <input type="text" id="mestre-roll-value" class="roll-value-input" placeholder="Dado">
+                    <button class="roll-btn-red" onclick="executeMestreRoll()">🎲</button>
+                </div>
+                <div style="font-size:9px; color:#64748b; margin-top:4px; text-align:center;">Rolagens <b>secretas</b> (apenas você vê)</div>
             </div>
         </div>
 
