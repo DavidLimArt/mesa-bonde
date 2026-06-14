@@ -895,50 +895,110 @@
         /* Hub de Rolagem Personalizada */
         .custom-roll-hub {
             display: flex;
-            gap: 8px;
-            margin-top: 15px;
-            background: rgba(0, 0, 0, 0.2);
-            padding: 10px;
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
+            gap: 4px;
             align-items: center;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 4px;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
         }
 
         .roll-select-container {
             position: relative;
-            flex: 2;
+            flex: 1.5;
         }
 
         .roll-name-input {
             width: 100%;
-            background: #065f46 !important; /* Verde escuro estilo Photoshop */
-            color: white !important;
+            background: #064e3b !important; /* Verde mais escuro */
+            color: #ecfdf5 !important;
             border: 1px solid #059669 !important;
-            padding: 8px !important;
-            font-size: 13px !important;
-            border-radius: 4px !important;
+            padding: 4px 6px !important;
+            font-size: 11px !important;
+            border-radius: 3px !important;
+            height: 24px;
         }
 
         .roll-value-input {
             flex: 1;
-            background: #1e40af !important; /* Azul escuro estilo Photoshop */
-            color: white !important;
+            background: #1e3a8a !important; /* Azul mais escuro */
+            color: #eff6ff !important;
             border: 1px solid #3b82f6 !important;
-            padding: 8px !important;
-            font-size: 13px !important;
-            border-radius: 4px !important;
+            padding: 4px 6px !important;
+            font-size: 11px !important;
+            border-radius: 3px !important;
             text-align: center;
+            height: 24px;
+            min-width: 50px;
         }
 
         .roll-btn-red {
-            background: #991b1b !important; /* Vermelho escuro estilo Photoshop */
+            background: #7f1d1d !important; /* Vermelho mais escuro */
             color: white !important;
             border: 1px solid #ef4444 !important;
-            padding: 8px 15px !important;
+            padding: 0 8px !important;
             font-weight: bold !important;
             cursor: pointer;
-            border-radius: 4px !important;
+            border-radius: 3px !important;
+            height: 24px;
+            font-size: 10px !important;
             transition: all 0.2s;
+        }
+
+        /* Dropdown de Rolagens Personalizado */
+        .rolls-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            width: 100%;
+            background: #0f172a;
+            border: 1px solid #059669;
+            border-radius: 4px;
+            z-index: 1000;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            margin-top: 2px;
+        }
+
+        .roll-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 8px;
+            cursor: pointer;
+            border-bottom: 1px solid rgba(5, 150, 105, 0.2);
+            font-size: 11px;
+            color: #ecfdf5;
+        }
+
+        .roll-item:hover {
+            background: rgba(5, 150, 105, 0.2);
+        }
+
+        .roll-item-info {
+            flex: 1;
+            display: flex;
+            justify-content: space-between;
+            padding-right: 10px;
+        }
+
+        .roll-item-val {
+            color: #3b82f6;
+            font-weight: bold;
+        }
+
+        .roll-item-delete {
+            color: #ef4444;
+            font-weight: bold;
+            padding: 0 4px;
+            border-radius: 3px;
+            transition: background 0.2s;
+        }
+
+        .roll-item-delete:hover {
+            background: rgba(239, 68, 68, 0.2);
         }
 
         .roll-btn-red:hover {
@@ -975,6 +1035,14 @@
         @keyframes diceFadeOut {
             0% { opacity: 1; }
             100% { opacity: 0; transform: translateY(-70%) scale(0.8); }
+        }
+
+        .dice-result-char {
+            font-size: 11px;
+            font-weight: bold;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
 
         .dice-result-name {
@@ -1548,18 +1616,20 @@
                             </div>
                             <div class="ficha-detail-item">
                                 <span class="ficha-detail-label">⚖️ Tendência</span>
-                                <input type="text" id="charAlignment" placeholder="Tendência">
+                                <div style="display:flex; gap:10px; align-items:center;">
+                                    <input type="text" id="charAlignment" placeholder="Tendência" style="flex:1;">
+                                    
+                                    <!-- Hub de Rolagem Compacto -->
+                                    <div class="custom-roll-hub" style="flex:1.5;">
+                                        <div class="roll-select-container">
+                                            <input type="text" id="roll-name" class="roll-name-input" placeholder="Rolagem" onclick="toggleRollsDropdown(event)">
+                                            <div id="rolls-dropdown" class="rolls-dropdown"></div>
+                                        </div>
+                                        <input type="text" id="roll-value" class="roll-value-input" placeholder="Dado">
+                                        <button class="roll-btn-red" onclick="executeCustomRoll()">🎲</button>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                        
-                        <!-- Hub de Rolagem Personalizada -->
-                        <div class="custom-roll-hub">
-                            <div class="roll-select-container">
-                                <input type="text" id="roll-name" class="roll-name-input" placeholder="Nome (ex: Iniciativa)" list="saved-rolls-list" onchange="loadSavedRollValue()">
-                                <datalist id="saved-rolls-list"></datalist>
-                            </div>
-                            <input type="text" id="roll-value" class="roll-value-input" placeholder="1d20+2">
-                            <button class="roll-btn-red" onclick="executeCustomRoll()">ROLAR</button>
                         </div>
                     </div>
                 </div>
@@ -3625,29 +3695,61 @@
         }
 
         // ===== ROLAGENS PERSONALIZADAS =====
-        function updateSavedRollsList() {
-            const char = allCharacters[currentCharacterIndex];
-            const list = document.getElementById('saved-rolls-list');
-            if (!list) return;
-            list.innerHTML = '';
-            if (char.customRolls) {
-                Object.keys(char.customRolls).forEach(name => {
-                    const opt = document.createElement('option');
-                    opt.value = name;
-                    list.appendChild(opt);
-                });
+        function toggleRollsDropdown(e) {
+            e.stopPropagation();
+            const dropdown = document.getElementById('rolls-dropdown');
+            if (dropdown.style.display === 'block') {
+                dropdown.style.display = 'none';
+            } else {
+                updateSavedRollsList();
+                dropdown.style.display = 'block';
             }
         }
 
-        function loadSavedRollValue() {
+        function updateSavedRollsList() {
             const char = allCharacters[currentCharacterIndex];
-            const nameInput = document.getElementById('roll-name');
-            const valInput = document.getElementById('roll-value');
-            const name = nameInput.value.trim();
-            if (char.customRolls && char.customRolls[name]) {
-                valInput.value = char.customRolls[name];
+            const dropdown = document.getElementById('rolls-dropdown');
+            if (!dropdown) return;
+            dropdown.innerHTML = '';
+            
+            if (char.customRolls && Object.keys(char.customRolls).length > 0) {
+                Object.entries(char.customRolls).forEach(([name, val]) => {
+                    const item = document.createElement('div');
+                    item.className = 'roll-item';
+                    item.onclick = (e) => {
+                        document.getElementById('roll-name').value = name;
+                        document.getElementById('roll-value').value = val;
+                        dropdown.style.display = 'none';
+                    };
+
+                    item.innerHTML = `
+                        <div class="roll-item-info">
+                            <span>${name}</span>
+                            <span class="roll-item-val">${val}</span>
+                        </div>
+                        <div class="roll-item-delete" onclick="event.stopPropagation(); deleteSavedRoll('${name}')">×</div>
+                    `;
+                    dropdown.appendChild(item);
+                });
+            } else {
+                dropdown.innerHTML = '<div style="padding:10px; font-size:10px; color:#64748b; text-align:center;">Nenhuma rolagem salva.</div>';
             }
         }
+
+        function deleteSavedRoll(name) {
+            const char = allCharacters[currentCharacterIndex];
+            if (char.customRolls && char.customRolls[name]) {
+                delete char.customRolls[name];
+                saveAll();
+                updateSavedRollsList();
+            }
+        }
+
+        // Fechar dropdown ao clicar fora
+        document.addEventListener('click', () => {
+            const dropdown = document.getElementById('rolls-dropdown');
+            if (dropdown) dropdown.style.display = 'none';
+        });
 
         function executeCustomRoll() {
             const char = allCharacters[currentCharacterIndex];
@@ -3661,11 +3763,10 @@
                 return;
             }
 
-            // Salvar no localStorage
+            // Salvar/Atualizar no localStorage
             if (!char.customRolls) char.customRolls = {};
             char.customRolls[name] = val;
             saveAll();
-            updateSavedRollsList();
 
             // Executar rolagem
             const result = parseDice(val);
@@ -3691,14 +3792,12 @@
 
         function showDiceAnimation(charName, rollName, rollCalc, result, natural) {
             const safeId = btoa(unescape(encodeURIComponent(charName))).replace(/[/+=]/g, '');
-            // Procurar no painel do mestre OU se for o próprio personagem local
             let card = document.querySelector(`[data-player-id="${safeId}"]`);
             
-            // Se não achou no painel do mestre, talvez seja a própria ficha do jogador
             if (!card && currentCharacterIndex !== -1) {
                 const char = allCharacters[currentCharacterIndex];
                 if (char && char.name === charName) {
-                    card = document.getElementById('fichaHeader'); // Animação no cabeçalho da ficha
+                    card = document.getElementById('fichaHeader');
                 }
             }
             
@@ -3709,6 +3808,17 @@
                 const popup = document.createElement('div');
                 popup.className = 'dice-result-popup';
                 
+                // Determinar cor do nome baseada no status online
+                let nameColor = 'var(--accent-color)';
+                const onlineData = jogadoresOnline[safeId];
+                if (onlineData) {
+                    const hpPerc = (onlineData.hp / onlineData.hpMax) * 100;
+                    nameColor = hpPerc > 50 ? '#4dff88' : (hpPerc > 20 ? '#ffd700' : '#ff4d4d');
+                    if (onlineData.conditionColor && onlineData.condition !== 'Nenhuma') {
+                        nameColor = onlineData.conditionColor;
+                    }
+                }
+
                 let critClass = '';
                 if (rollCalc.toLowerCase().includes('1d20')) {
                     if (natural === 20) critClass = 'crit-success';
@@ -3716,6 +3826,7 @@
                 }
 
                 popup.innerHTML = `
+                    <div class="dice-result-char" style="color:${nameColor}">${charName}</div>
                     <div class="dice-result-name">${rollName}</div>
                     <div class="dice-result-calc">${rollCalc}</div>
                     <div class="dice-result-total ${critClass}">${result}</div>
